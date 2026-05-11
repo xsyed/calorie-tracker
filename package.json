@@ -1,0 +1,41 @@
+{
+  "name": "calories-app",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && npm run -w apps/mobile typecheck",
+    "lint": "eslint . --cache",
+    "knip": "knip",
+    "duplication": "jscpd .",
+    "deps": "depcruise apps packages --config .dependency-cruiser.js",
+    "shared-check": "tsx tooling/scripts/check-shared.ts",
+    "security": "semgrep scan --config=auto",
+    "check": "npm run typecheck && npm run lint && npm run knip && npm run duplication && npm run deps && npm run shared-check && npm run security",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --cache --fix",
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "dependency-cruiser": "^17.4.0",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-sonarjs": "^3.0.7",
+    "husky": "^9.1.7",
+    "jscpd": "^4.1.0",
+    "knip": "^6.12.2",
+    "lint-staged": "^16.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}

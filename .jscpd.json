@@ -1,0 +1,12 @@
+{
+  "threshold": 5,
+  "reporters": ["consoleFull"],
+  "format": ["typescript", "tsx", "javascript", "jsx"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "mode": "mild"
+}

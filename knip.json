@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["tooling/scripts/*.ts"],
+      "project": ["tooling/**/*.ts"]
+    },
+    "apps/mobile": {
+      "entry": ["src/auth/index.ts"],
+      "project": ["**/*.ts", "**/*.tsx"]
+    }
+  },
+  "ignoreDependencies": ["lint-staged", "@babel/runtime"],
+  "ignoreBinaries": ["semgrep", "prettier"]
+}
