@@ -2,18 +2,27 @@
 
 ## Project Overview
 
+Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
+
+**apps/mobile** — React Native 0.85.3 bare workflow, TypeScript strict.
+- **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
+- **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Single `User` table (`id`, `firebase_uid`).
+- **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding (stub) → Home (stub).
+- **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`. No UI library.
+
+No backend, no shared packages, no tests. Onboarding & Home screens are stubs. All other features (food/water/weight tracking, LLM parsing, offline queue, backend proxy) exist only as specs in `docs/features/`.
 
 ---
 
 
 ## Toolchain & Quality Gate
 
-Run `npm run check` after every change. Never commit without it passing.
+Run `npm run check` after every code change. Never commit without it passing.
 
 | Check | Command | Enforces |
 |---|---|---|
 | Type safety | `npm run typecheck` | Strict TS: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitAny`, etc. |
-| Lint | `npm run lint` | Complexity (max 10), cognitive complexity (max 15), max-lines (300), max-len (100), max-depth (4), import order, no cycles |
+| Lint | `npm run lint` | Complexity (max 15), cognitive complexity (max 18), max-lines (500), max-len (150), max-depth (4), import order, no cycles |
 | Dead code | `npm run knip` | Unused exports, deps, files |
 | Duplication | `npm run duplication` | Copy-paste detection (JSCPD, threshold 5%) |
 | Architecture | `npm run deps` | No cross-feature imports, no app↔package direction violations, no circular deps (Dependency Cruiser) |
@@ -77,6 +86,12 @@ After **any** correction from the user:
 
 ## Plan mode
 - Ask any clarifying questions before writing code or proposing a solution.
+
+## Keeping AGENTS.md Current
+
+After **all tasks for a feature are complete**, update `## Project Overview` to reflect any major change introduced — new dependencies, new screens, new database tables, new infrastructure. Reference the actual code when adding to the overview. Keep it concise.
+
+---
 
 ## Advisor Behavior
 

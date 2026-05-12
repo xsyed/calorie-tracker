@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
@@ -62,6 +62,10 @@ export default function RootNavigator() {
     prevStatus.current = auth.status;
   }, [auth.status]);
 
+  const handleOnboardingComplete = useCallback(() => {
+    setUserCheckState('exists');
+  }, []);
+
   const showSplash =
     auth.status === 'checking' ||
     (auth.status === 'authenticated' && userCheckState === 'pending');
@@ -81,7 +85,11 @@ export default function RootNavigator() {
       ) : userCheckState === 'exists' ? (
         <Stack.Screen name="Home" component={HomeScreen} />
       ) : (
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          initialParams={{ onOnboardingComplete: handleOnboardingComplete }}
+        />
       )}
     </Stack.Navigator>
   );
