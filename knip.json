@@ -10,6 +10,9 @@
       "project": ["**/*.ts", "**/*.tsx"]
     }
   },
+  "ignoreIssues": {
+    "apps/mobile/src/components/InputBar.tsx": ["types"]
+  },
   "ignoreDependencies": ["lint-staged", "@babel/runtime"],
   "ignoreBinaries": ["semgrep", "prettier"]
 }

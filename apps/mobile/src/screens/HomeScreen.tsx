@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,8 +11,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth';
 import InputBar from '../components/InputBar';
+import type { InputBarHandle } from '../components/InputBar';
 import { getUser, saveParsedLogEntry, insertFoodEntry } from '../database';
-import { parseFoodText } from '../services';
+import { useVoiceInput, parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
 
 function getTodayDate(): string {
@@ -21,6 +22,32 @@ function getTodayDate(): string {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function mapVoiceError(error: string): string {
+  if (error.includes('Microphone access')) {
+    return 'Microphone access needed. Enable in Settings.';
+  }
+  if (
+    error.includes('unavailable') ||
+    error.includes('Speech recognition')
+  ) {
+    return 'Voice input not available for your device language.';
+  }
+  if (
+    error === '7' ||
+    error.includes('no match') ||
+    error.includes('No match')
+  ) {
+    return "Didn't catch that. Tap mic to try again.";
+  }
+  if (error.includes('busy') || error.includes('Busy')) {
+    return 'Cannot use mic while another app is using it.';
+  }
+  if (error.includes('network') || error.includes('Network')) {
+    return 'Voice input needs internet.';
+  }
+  return error;
 }
 
 function mapErrorToUserMessage(code: ParseErrorCode): string {
@@ -56,6 +83,28 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputBarRef = useRef<InputBarHandle>(null);
+
+  const voice = useVoiceInput();
+
+  const onMicPress = useCallback(() => {
+    switch (voice.status) {
+      case 'idle':
+      case 'stopped':
+      case 'error':
+        voice.startListening();
+        break;
+      case 'listening':
+      case 'processing':
+        voice.stopListening();
+        break;
+    }
+  }, [voice.status, voice.startListening, voice.stopListening]);
+
+  const isVoiceAvailable = useMemo(
+    () => voice.isAvailable && !isSubmitting,
+    [voice.isAvailable, isSubmitting],
+  );
 
   useEffect(() => {
     if (auth.user) {
@@ -64,6 +113,25 @@ export default function HomeScreen() {
       });
     }
   }, [auth.user?.uid]);
+
+  useEffect(() => {
+    if (voice.status !== 'stopped' || voice.finalText === null) return;
+
+    if (voice.finalText.length === 0) {
+      setError("Didn't catch that. Tap mic to try again.");
+      voice.clearFinalText();
+      return;
+    }
+
+    inputBarRef.current?.setText(voice.finalText);
+    voice.clearFinalText();
+  }, [voice.status, voice.finalText, voice.clearFinalText]);
+
+  useEffect(() => {
+    if (voice.error !== null) {
+      setError(mapVoiceError(voice.error));
+    }
+  }, [voice.error]);
 
   useEffect(() => {
     if (error !== null) {
@@ -177,9 +245,14 @@ export default function HomeScreen() {
         ]}
       >
         <InputBar
+          ref={inputBarRef}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           onChangeText={handleChangeText}
+          voiceStatus={voice.status}
+          voicePartialText={voice.partialText}
+          isVoiceAvailable={isVoiceAvailable}
+          onMicPress={onMicPress}
         />
       </View>
     </KeyboardAvoidingView>

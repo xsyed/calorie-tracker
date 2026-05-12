@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,20 +8,70 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import WaveformIndicator from './WaveformIndicator';
+
+export interface InputBarHandle {
+  setText: (text: string) => void;
+}
 
 interface InputBarProps {
   onSubmit: (text: string) => Promise<void>;
   isSubmitting: boolean;
   onChangeText?: (text: string) => void;
+  voiceStatus?: 'idle' | 'listening' | 'processing' | 'stopped' | 'error';
+  voicePartialText?: string;
+  voiceError?: string | null;
+  isVoiceAvailable?: boolean;
+  onMicPress?: () => void;
 }
 
-export default function InputBar({
+function MicIcon({ color }: { color: string }) {
+  return (
+    <View style={micStyles.container}>
+      <View style={[micStyles.head, { backgroundColor: color }]} />
+      <View style={[micStyles.body, { backgroundColor: color }]} />
+      <View style={[micStyles.base, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
   onSubmit,
   isSubmitting,
   onChangeText,
-}: InputBarProps) {
-  const [text, setText] = useState('');
+  voiceStatus,
+  voicePartialText,
+  voiceError: _voiceError,
+  isVoiceAvailable,
+  onMicPress,
+}, ref) {
+  const [text, setRawText] = useState('');
   const isDarkMode = useColorScheme() === 'dark';
+  const ignoreVoicePartialRef = useRef(false);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setText: (newText: string) => {
+        ignoreVoicePartialRef.current = true;
+        setRawText(newText);
+      },
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    if (voiceStatus === 'listening') {
+      ignoreVoicePartialRef.current = false;
+    }
+  }, [voiceStatus]);
+
+  useEffect(() => {
+    if (ignoreVoicePartialRef.current) return;
+    if (voicePartialText !== undefined && voicePartialText !== '' && voiceStatus === 'listening') {
+      setRawText(voicePartialText);
+    }
+  }, [voicePartialText, voiceStatus]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = text.trim();
@@ -29,7 +79,8 @@ export default function InputBar({
 
     try {
       await onSubmit(trimmed);
-      setText('');
+      setRawText('');
+      ignoreVoicePartialRef.current = false;
     } catch {
       // keep text on failure
     }
@@ -37,7 +88,7 @@ export default function InputBar({
 
   const handleChangeText = useCallback(
     (newText: string) => {
-      setText(newText);
+      setRawText(newText);
       onChangeText?.(newText);
     },
     [onChangeText],
@@ -47,10 +98,37 @@ export default function InputBar({
     handleSubmit();
   }, [handleSubmit]);
 
+  const handleMicPress = useCallback(() => {
+    if (isVoiceAvailable === false) return;
+    onMicPress?.();
+  }, [isVoiceAvailable, onMicPress]);
+
   const trimmedEmpty = text.trim().length === 0;
+  const showMic = onMicPress !== undefined;
+  const isListening = voiceStatus === 'listening' || voiceStatus === 'processing';
+  const micDisabled = isVoiceAvailable === false;
+  const iconColor = isDarkMode ? '#FFFFFF' : '#000000';
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
+      {showMic && (
+        <Pressable
+          onPress={handleMicPress}
+          disabled={micDisabled}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          style={[
+            styles.micButton,
+            isDarkMode && styles.micButtonDark,
+            micDisabled && styles.micButtonDisabled,
+          ]}
+        >
+          {isListening ? (
+            <WaveformIndicator isActive />
+          ) : (
+            <MicIcon color={iconColor} />
+          )}
+        </Pressable>
+      )}
       <TextInput
         style={[styles.input, isDarkMode && styles.inputDark]}
         placeholder="What did you eat or do?"
@@ -91,7 +169,31 @@ export default function InputBar({
       )}
     </View>
   );
-}
+});
+
+const micStyles = StyleSheet.create({
+  container: {
+    width: 14,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  head: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginBottom: 1,
+  },
+  body: {
+    width: 4,
+    height: 5,
+  },
+  base: {
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -119,6 +221,21 @@ const styles = StyleSheet.create({
   inputDark: {
     backgroundColor: '#2C2C2E',
     color: '#FFFFFF',
+  },
+  micButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  micButtonDark: {
+    backgroundColor: '#3A3A3C',
+  },
+  micButtonDisabled: {
+    opacity: 0.4,
   },
   spinner: {
     marginLeft: 12,

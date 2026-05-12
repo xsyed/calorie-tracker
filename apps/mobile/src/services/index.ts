@@ -8,3 +8,9 @@ export type {
   ParseResult,
   ParseErrorCode,
 } from './llmService';
+export { useVoiceInput } from './voiceService';
+export type {
+  VoiceInputStatus,
+  VoiceInputState,
+  VoiceInputActions,
+} from './voiceService';

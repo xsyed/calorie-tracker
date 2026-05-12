@@ -14,7 +14,8 @@
     "shared-check": "tsx tooling/scripts/check-shared.ts",
     "security": "semgrep scan --config=auto",
     "check": "npm run typecheck && npm run lint && npm run knip && npm run duplication && npm run deps && npm run shared-check && npm run security",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "npx patch-package"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -35,6 +36,7 @@
     "jscpd": "^4.1.0",
     "knip": "^6.12.2",
     "lint-staged": "^16.4.0",
+    "patch-package": "^8.0.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
