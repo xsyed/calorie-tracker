@@ -23,3 +23,38 @@ export interface OnboardingFormData {
   target_weight_kg?: number;
   timeframe_days?: number;
 }
+
+export interface FoodEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  raw_text: string;
+  status: 'pending' | 'complete' | 'failed';
+  retry_count: number;
+  created_at: string;
+}
+
+export interface FoodItem {
+  id: string;
+  food_entry_id: string;
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export interface ExerciseEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  exercise_type: string;
+  duration_minutes: number;
+  calories_burned: number;
+  timestamp: string;
+}
+
+export interface AppSetting {
+  key: string;
+  value: string;
+}

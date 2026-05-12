@@ -6,7 +6,7 @@
       "project": ["tooling/**/*.ts"]
     },
     "apps/mobile": {
-      "entry": ["src/auth/index.ts", "src/database/index.ts", "src/onboarding/index.ts"],
+      "entry": ["src/auth/index.ts", "src/database/index.ts", "src/onboarding/index.ts", "src/services/index.ts"],
       "project": ["**/*.ts", "**/*.tsx"]
     }
   },

@@ -24,5 +24,48 @@ export function initDatabase(): DB {
       ')',
     [],
   );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS food_entries (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'date TEXT NOT NULL, ' +
+      'raw_text TEXT NOT NULL, ' +
+      "status TEXT NOT NULL DEFAULT 'pending', " +
+      'retry_count INTEGER NOT NULL DEFAULT 0, ' +
+      'created_at TEXT NOT NULL' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS food_items (' +
+      'id TEXT PRIMARY KEY, ' +
+      'food_entry_id TEXT NOT NULL, ' +
+      'name TEXT NOT NULL, ' +
+      'calories REAL NOT NULL, ' +
+      'protein_g REAL NOT NULL, ' +
+      'carbs_g REAL NOT NULL, ' +
+      'fat_g REAL NOT NULL' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS exercise_entries (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'date TEXT NOT NULL, ' +
+      'exercise_type TEXT NOT NULL, ' +
+      'duration_minutes REAL NOT NULL, ' +
+      'calories_burned REAL NOT NULL, ' +
+      'timestamp TEXT NOT NULL' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS app_settings (' +
+      'key TEXT PRIMARY KEY, ' +
+      'value TEXT NOT NULL' +
+      ')',
+    [],
+  );
   return db;
 }
