@@ -94,6 +94,15 @@ export async function getFoodItemsByEntryId(
   return (result.rows as Record<string, unknown>[]).map(mapRowToFoodItem);
 }
 
+export async function getPendingEntries(): Promise<FoodEntry[]> {
+  const db = initDatabase();
+  const result = await db.execute(
+    "SELECT * FROM food_entries WHERE status = 'pending' ORDER BY created_at ASC",
+    [],
+  );
+  return (result.rows as Record<string, unknown>[]).map(mapRowToFoodEntry);
+}
+
 export async function updateFoodEntryStatus(
   id: string,
   status: 'complete' | 'failed',
@@ -111,6 +120,75 @@ export async function incrementRetryCount(id: string): Promise<void> {
     'UPDATE food_entries SET retry_count = retry_count + 1 WHERE id = ?',
     [id],
   );
+}
+
+export async function completePendingEntry(
+  entryId: string,
+  userId: string,
+  date: string,
+  foods: Array<{
+    name: string;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+  }>,
+  exercises: Array<{
+    exercise_type: string;
+    duration_minutes: number;
+    calories_burned: number;
+  }>,
+): Promise<void> {
+  const db = initDatabase();
+
+  await db.execute('BEGIN', []);
+
+  try {
+    await db.execute(
+      "UPDATE food_entries SET status = 'complete' WHERE id = ?",
+      [entryId],
+    );
+
+    for (const food of foods) {
+      const itemId = generateId();
+      await db.execute(
+        `INSERT INTO food_items (id, food_entry_id, name, calories, protein_g, carbs_g, fat_g)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          itemId,
+          entryId,
+          food.name,
+          food.calories,
+          food.protein_g,
+          food.carbs_g,
+          food.fat_g,
+        ],
+      );
+    }
+
+    const timestamp = new Date().toISOString();
+    for (const exercise of exercises) {
+      const exerciseEntryId = generateId();
+      await db.execute(
+        `INSERT INTO exercise_entries (id, user_id, date, exercise_type, duration_minutes, calories_burned, timestamp)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          exerciseEntryId,
+          userId,
+          date,
+          exercise.exercise_type,
+          exercise.duration_minutes,
+          exercise.calories_burned,
+          timestamp,
+        ],
+      );
+    }
+
+    await db.execute('COMMIT', []);
+  } catch (error) {
+    await db.execute('ROLLBACK', []);
+    throw error;
+  }
 }
 
 export async function saveParsedLogEntry(params: {

@@ -43,6 +43,7 @@ export interface ParseFailure {
   outcome: 'error';
   error: ParseErrorCode;
   message: string;
+  retryAfterMs?: number;
 }
 
 export type ParseResult = ParseSuccess | ParseFailure;
@@ -166,10 +167,15 @@ async function fetchWithTimeout(
   }
 }
 
-export async function parseFoodText(prompt: string): Promise<ParseResult> {
-  const isConnected = await checkConnectivity();
-  if (!isConnected) {
-    return { outcome: 'error', error: 'no_network', message: 'No network connection' };
+export async function parseFoodText(
+  prompt: string,
+  options?: { skipConnectivityCheck?: boolean },
+): Promise<ParseResult> {
+  if (!options?.skipConnectivityCheck) {
+    const isConnected = await checkConnectivity();
+    if (!isConnected) {
+      return { outcome: 'error', error: 'no_network', message: 'No network connection' };
+    }
   }
 
   const deviceId = await getOrCreateDeviceId();
@@ -226,8 +232,30 @@ export async function parseFoodText(prompt: string): Promise<ParseResult> {
 
   if (response.status !== 200) {
     switch (response.status) {
-      case 429:
-        return { outcome: 'error', error: 'rate_limit_exceeded', message: 'Rate limit exceeded' };
+      case 429: {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        let retryAfterMs: number | undefined;
+        if (retryAfterHeader) {
+          const deltaSeconds = parseInt(retryAfterHeader, 10);
+          if (!isNaN(deltaSeconds)) {
+            retryAfterMs = deltaSeconds * 1000;
+          } else {
+            const dateVal = Date.parse(retryAfterHeader);
+            if (!isNaN(dateVal)) {
+              retryAfterMs = Math.max(0, dateVal - Date.now());
+            }
+          }
+        }
+        const rateLimitResult: ParseFailure = {
+          outcome: 'error',
+          error: 'rate_limit_exceeded',
+          message: 'Rate limit exceeded',
+        };
+        if (retryAfterMs !== undefined) {
+          rateLimitResult.retryAfterMs = retryAfterMs;
+        }
+        return rateLimitResult;
+      }
       case 502:
         return { outcome: 'error', error: 'parse_failed', message: 'Parse failed' };
       case 504:

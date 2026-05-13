@@ -8,6 +8,7 @@ export type {
   ParseResult,
   ParseErrorCode,
 } from './llmService';
+export { flushQueue } from './queueFlusher';
 export { useVoiceInput } from './voiceService';
 export type {
   VoiceInputStatus,

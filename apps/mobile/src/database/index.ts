@@ -5,9 +5,11 @@ export {
   insertFoodItem,
   getFoodEntriesByDate,
   getFoodItemsByEntryId,
+  getPendingEntries,
   updateFoodEntryStatus,
   incrementRetryCount,
   saveParsedLogEntry,
+  completePendingEntry,
 } from './foodRepository';
 export {
   insertExerciseEntry,

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth';
 import InputBar from '../components/InputBar';
 import type { InputBarHandle } from '../components/InputBar';
-import { getUser, saveParsedLogEntry, insertFoodEntry } from '../database';
+import { getUser, saveParsedLogEntry, insertFoodEntry, getSetting } from '../database';
 import { useVoiceInput, parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
 
@@ -150,6 +150,30 @@ export default function HomeScreen() {
       setSubmitting(true);
       setError(null);
 
+      const resetAt = await getSetting('rate_limit_reset_at');
+      if (resetAt && new Date(resetAt) > new Date()) {
+        const userId = userIdRef.current;
+        if (userId !== null) {
+          try {
+            await insertFoodEntry({
+              user_id: userId,
+              date: getTodayDate(),
+              raw_text: text,
+              status: 'pending',
+              retry_count: 0,
+              created_at: new Date().toISOString(),
+            });
+          } catch {
+            setError('Failed to save entry. Tap to retry.');
+            setSubmitting(false);
+            return;
+          }
+        }
+        setError('Daily limit reached. Entry saved — will process when limit resets.');
+        setSubmitting(false);
+        return;
+      }
+
       const result = await parseFoodText(text);
 
       if (result.outcome === 'success') {
@@ -192,6 +216,7 @@ export default function HomeScreen() {
                 retry_count: 0,
                 created_at: new Date().toISOString(),
               });
+              inputBarRef.current?.setText('');
             } catch {
               // silently ignore pending save failure
             }

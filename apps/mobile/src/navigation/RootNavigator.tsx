@@ -7,6 +7,7 @@ import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import { FlushTriggers } from '../services/FlushTriggers';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -71,27 +72,30 @@ export default function RootNavigator() {
     (auth.status === 'authenticated' && userCheckState === 'pending');
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {showSplash ? (
-        <Stack.Screen name="Splash" component={SplashScreen} />
-      ) : auth.status === 'unauthenticated' ? (
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          initialParams={
-            sessionError !== null ? { message: sessionError } : undefined
-          }
-        />
-      ) : userCheckState === 'exists' ? (
-        <Stack.Screen name="Home" component={HomeScreen} />
-      ) : (
-        <Stack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          initialParams={{ onOnboardingComplete: handleOnboardingComplete }}
-        />
-      )}
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {showSplash ? (
+          <Stack.Screen name="Splash" component={SplashScreen} />
+        ) : auth.status === 'unauthenticated' ? (
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            initialParams={
+              sessionError !== null ? { message: sessionError } : undefined
+            }
+          />
+        ) : userCheckState === 'exists' ? (
+          <Stack.Screen name="Home" component={HomeScreen} />
+        ) : (
+          <Stack.Screen
+            name="Onboarding"
+            component={OnboardingScreen}
+            initialParams={{ onOnboardingComplete: handleOnboardingComplete }}
+          />
+        )}
+      </Stack.Navigator>
+      {userCheckState === 'exists' && <FlushTriggers />}
+    </>
   );
 }
 
