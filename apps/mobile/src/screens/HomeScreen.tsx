@@ -11,7 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
 import DailySummary from '../components/DailySummary';
@@ -34,13 +35,17 @@ import {
   getDailyCalorieTotals,
   getLoggedDatesInRange,
   getDailyWaterTotal,
+  getDailyWaterGoal,
   insertWaterEntry,
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
   saveFoodEntryAsSavedMeal,
 } from '../database';
+import type { RootStackParamList } from '../navigation/types';
 import { parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
+
+type HomeNavigation = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 function getTodayDate(): string {
   const now = new Date();
@@ -109,6 +114,7 @@ function mapErrorToUserMessage(code: ParseErrorCode): string {
 
 export default function HomeScreen() {
   const auth = useAuth();
+  const navigation = useNavigation<HomeNavigation>();
   const isDarkMode = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const [isSubmitting, setSubmitting] = useState(false);
@@ -135,11 +141,12 @@ export default function HomeScreen() {
   const [foodEntries, setFoodEntries] = useState<EntryListFoodEntry[]>([]);
   const [exerciseEntries, setExerciseEntries] = useState<EntryListExerciseEntry[]>([]);
   const [dailyWaterTotal, setDailyWaterTotal] = useState(0);
+  const [waterGoal, setWaterGoal] = useState(DEFAULT_WATER_GOAL);
   const [exerciseCalories, setExerciseCalories] = useState(0);
   const [loggedDates, setLoggedDates] = useState<Set<string>>(new Set());
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [isAddingWater, setIsAddingWater] = useState(false);
+  const [addingWaterAmount, setAddingWaterAmount] = useState<number | null>(null);
   const [isHistoryOverlayVisible, setHistoryOverlayVisible] = useState(false);
   const [saveMealEntryId, setSaveMealEntryId] = useState<string | null>(null);
   const [saveMealName, setSaveMealName] = useState('');
@@ -172,13 +179,14 @@ export default function HomeScreen() {
     setDataError(null);
 
     try {
-      const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal] =
+      const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal, dailyWaterGoal] =
         await Promise.all([
           getUser(uid),
           getFoodEntriesByDate(uid, date),
           getExerciseEntriesByDate(uid, date),
           getDailyExerciseCalories(uid, date),
           getDailyWaterTotal(uid, date),
+          getDailyWaterGoal(),
         ]);
 
       setUserTargets({
@@ -190,6 +198,7 @@ export default function HomeScreen() {
 
       setExerciseCalories(exerciseCals);
       setDailyWaterTotal(waterTotal);
+      setWaterGoal(dailyWaterGoal);
 
       const entriesWithItems: EntryListFoodEntry[] = [];
       for (const entry of foodEntriesResult) {
@@ -369,7 +378,8 @@ export default function HomeScreen() {
   const handleAddWater = useCallback(async (amountMl: number) => {
     const uid = userIdRef.current;
     if (uid === null) return;
-    setIsAddingWater(true);
+    setAddingWaterAmount(amountMl);
+    setError(null);
     try {
       await insertWaterEntry({
         user_id: uid,
@@ -379,10 +389,17 @@ export default function HomeScreen() {
       });
       const total = await getDailyWaterTotal(uid, selectedDate);
       setDailyWaterTotal(total);
+    } catch {
+      setError('Failed to log water. Try again.');
+      throw new Error('Failed to log water');
     } finally {
-      setIsAddingWater(false);
+      setAddingWaterAmount(null);
     }
   }, [selectedDate]);
+
+  const handleOpenWater = useCallback(() => {
+    navigation.navigate('Water', { date: selectedDate });
+  }, [navigation, selectedDate]);
 
   const onDateSelect = useCallback((date: string) => {
     setSelectedDate(date);
@@ -533,9 +550,11 @@ export default function HomeScreen() {
             />
             <WaterQuickAdd
               dailyTotal={dailyWaterTotal}
-              waterGoal={DEFAULT_WATER_GOAL}
+              waterGoal={waterGoal}
               onAddWater={handleAddWater}
-              isAdding={isAddingWater}
+              addingAmountMl={addingWaterAmount}
+              dateLabel={dateLabel}
+              onOpenWater={handleOpenWater}
             />
             <EntryList
               foodEntries={foodEntries}

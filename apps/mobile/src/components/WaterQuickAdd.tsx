@@ -1,9 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useColorScheme,
   View,
 } from 'react-native';
@@ -14,14 +13,18 @@ interface WaterQuickAddProps {
   dailyTotal: number;
   waterGoal: number;
   onAddWater: (amountMl: number) => Promise<void>;
-  isAdding: boolean;
+  addingAmountMl: number | null;
+  dateLabel: string;
+  onOpenWater: () => void;
 }
 
 export default function WaterQuickAdd({
   dailyTotal,
   waterGoal,
   onAddWater,
-  isAdding,
+  addingAmountMl,
+  dateLabel,
+  onOpenWater,
 }: WaterQuickAddProps) {
   const isDarkMode = useColorScheme() === 'dark';
   const effectiveGoal = waterGoal > 0 ? waterGoal : DEFAULT_WATER_GOAL;
@@ -30,21 +33,19 @@ export default function WaterQuickAdd({
     100,
   );
   const barWidth = Math.min((dailyTotal / effectiveGoal) * 100, 100);
-
   const debounceRef = useRef(false);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customAmount, setCustomAmount] = useState('');
-  const [customError, setCustomError] = useState<string | null>(null);
 
   const accentColor = isDarkMode ? '#0A84FF' : '#007AFF';
-  const hasWater = dailyTotal > 0;
-  const buttonsDisabled = isAdding;
+  const buttonsDisabled = addingAmountMl !== null;
 
-  async function handleQuickAdd(amount: number) {
-    if (debounceRef.current || isAdding) return;
+  async function handleQuickAdd(amountMl: number) {
+    if (debounceRef.current || addingAmountMl !== null) return;
+
     debounceRef.current = true;
     try {
-      await onAddWater(amount);
+      await onAddWater(amountMl);
+    } catch {
+      return;
     } finally {
       setTimeout(() => {
         debounceRef.current = false;
@@ -52,46 +53,21 @@ export default function WaterQuickAdd({
     }
   }
 
-  async function handleCustomSubmit() {
-    const trimmed = customAmount.trim();
-    if (trimmed === '') return;
-    const amount = parseInt(trimmed, 10);
-    if (isNaN(amount) || amount < 1 || amount > 5000) {
-      setCustomError('Enter 1–5000ml');
-      return;
-    }
-    if (isAdding) return;
-    try {
-      await onAddWater(amount);
-      setCustomAmount('');
-      setShowCustom(false);
-      setCustomError(null);
-    } catch {
-      // parent handles error, keep input visible for retry
-    }
-  }
-
-  function handleCustomPress() {
-    setShowCustom((prev) => !prev);
-    setCustomError(null);
-    if (showCustom) {
-      setCustomAmount('');
-    }
-  }
-
   return (
     <View style={[styles.card, isDarkMode && styles.cardDark]}>
-      <Text style={[styles.title, isDarkMode && styles.titleDark]}>Water</Text>
+      <View style={styles.header}>
+        <Text style={[styles.title, isDarkMode && styles.titleDark]}>Water</Text>
+        <Pressable onPress={onOpenWater} hitSlop={8}>
+          <Text style={[styles.openLink, { color: accentColor }]}>View</Text>
+        </Pressable>
+      </View>
 
-      {hasWater ? (
-        <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]}>
-          {dailyTotal}ml / {effectiveGoal}ml ({percentage}%)
-        </Text>
-      ) : (
-        <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-          No water logged yet today
-        </Text>
-      )}
+      <Text style={[styles.contextLabel, isDarkMode && styles.contextLabelDark]}>
+        Logging to {dateLabel}
+      </Text>
+      <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]}>
+        {dailyTotal}ml / {effectiveGoal}ml ({percentage}%)
+      </Text>
 
       <View style={[styles.track, isDarkMode && styles.trackDark]}>
         <View
@@ -112,13 +88,8 @@ export default function WaterQuickAdd({
             buttonsDisabled && styles.pillButtonDisabled,
           ]}
         >
-          <Text
-            style={[
-              styles.pillButtonText,
-              { color: accentColor },
-            ]}
-          >
-            +200ml
+          <Text style={[styles.pillButtonText, { color: accentColor }]}>
+            {addingAmountMl === 200 ? 'Adding...' : '+200ml'}
           </Text>
         </Pressable>
 
@@ -131,72 +102,11 @@ export default function WaterQuickAdd({
             buttonsDisabled && styles.pillButtonDisabled,
           ]}
         >
-          <Text
-            style={[
-              styles.pillButtonText,
-              { color: accentColor },
-            ]}
-          >
-            +500ml
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleCustomPress}
-          disabled={buttonsDisabled}
-          style={[
-            styles.pillButton,
-            { borderColor: accentColor },
-            buttonsDisabled && styles.pillButtonDisabled,
-          ]}
-        >
-          <Text
-            style={[
-              styles.pillButtonText,
-              { color: accentColor },
-            ]}
-          >
-            +Custom
+          <Text style={[styles.pillButtonText, { color: accentColor }]}>
+            {addingAmountMl === 500 ? 'Adding...' : '+500ml'}
           </Text>
         </Pressable>
       </View>
-
-      {showCustom && (
-        <View style={styles.customContainer}>
-          <View style={styles.customRow}>
-            <TextInput
-              style={[
-                styles.customInput,
-                isDarkMode && styles.customInputDark,
-                customError !== null && styles.customInputError,
-              ]}
-              placeholder="ml"
-              placeholderTextColor={isDarkMode ? '#888888' : '#999999'}
-              value={customAmount}
-              onChangeText={(text) => {
-                setCustomAmount(text);
-                setCustomError(null);
-              }}
-              keyboardType="number-pad"
-              editable={!isAdding}
-            />
-            <Pressable
-              onPress={handleCustomSubmit}
-              disabled={isAdding}
-              style={[
-                styles.customSubmit,
-                { backgroundColor: accentColor },
-                isAdding && styles.customSubmitDisabled,
-              ]}
-            >
-              <Text style={styles.customSubmitText}>Add</Text>
-            </Pressable>
-          </View>
-          {customError !== null && (
-            <Text style={styles.customError}>{customError}</Text>
-          )}
-        </View>
-      )}
     </View>
   );
 }
@@ -210,6 +120,11 @@ const styles = StyleSheet.create({
   cardDark: {
     backgroundColor: '#1C1C1E',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 16,
     fontWeight: '700',
@@ -217,6 +132,18 @@ const styles = StyleSheet.create({
   },
   titleDark: {
     color: '#FFFFFF',
+  },
+  openLink: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  contextLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 8,
+  },
+  contextLabelDark: {
+    color: '#999999',
   },
   statsLabel: {
     fontSize: 14,
@@ -226,16 +153,6 @@ const styles = StyleSheet.create({
   },
   statsLabelDark: {
     color: '#FFFFFF',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  emptyTextDark: {
-    color: '#999999',
   },
   track: {
     height: 8,
@@ -267,50 +184,5 @@ const styles = StyleSheet.create({
   pillButtonText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  customContainer: {
-    marginTop: 8,
-  },
-  customRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  customInput: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-    color: '#000000',
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  customInputDark: {
-    backgroundColor: '#2C2C2E',
-    color: '#FFFFFF',
-  },
-  customInputError: {
-    borderColor: '#FF3B30',
-  },
-  customSubmit: {
-    marginLeft: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  customSubmitDisabled: {
-    opacity: 0.4,
-  },
-  customSubmitText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  customError: {
-    fontSize: 12,
-    color: '#FF3B30',
-    marginTop: 4,
-    marginLeft: 4,
   },
 });

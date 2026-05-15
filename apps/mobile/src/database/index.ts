@@ -27,7 +27,16 @@ export {
   createFoodEntryFromSavedMeal,
 } from './historySavedMealsRepository';
 export { getSetting, setSetting } from './appSettingsRepository';
-export { insertWaterEntry, getWaterEntriesByDate, getDailyWaterTotal } from './waterRepository';
+export {
+  DEFAULT_DAILY_WATER_GOAL_ML,
+  deleteWaterEntry,
+  getDailyWaterGoal,
+  getDailyWaterTotal,
+  getWaterEntriesByDate,
+  getWaterTotalsByDateRange,
+  insertWaterEntry,
+  setDailyWaterGoal,
+} from './waterRepository';
 export type {
   User,
   OnboardingFormData,
@@ -37,6 +46,7 @@ export type {
   ExerciseEntry,
   AppSetting,
   WaterEntry,
+  WaterDailyTotal,
   SavedMeal,
   SavedMealItem,
   SavedMealWithItems,

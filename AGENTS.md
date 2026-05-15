@@ -6,11 +6,11 @@ Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
 
 **apps/mobile** — React Native 0.85.3 bare workflow, TypeScript strict.
 - **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
-- **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Single `User` table (`id`, `firebase_uid`).
-- **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding (stub) → Home (stub).
+- **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Tables include `User`, food/exercise logs, app settings, water entries, saved meals.
+- **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding → Home → Water.
 - **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`. No UI library.
 
-No backend, no shared packages, no tests. Onboarding & Home screens are stubs. All other features (food/water/weight tracking, LLM parsing, offline queue, backend proxy) exist only as specs in `docs/features/`.
+No backend, no shared packages, no tests. Home supports food/exercise logging, saved meals/history, and water quick-add. Water has daily logging for selected date. Other features (weight tracking, backend proxy) exist only as specs in `docs/features/`.
 
 ---
 

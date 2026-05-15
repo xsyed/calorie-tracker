@@ -72,6 +72,11 @@ export interface WaterEntry {
   timestamp: string;
 }
 
+export interface WaterDailyTotal {
+  date: string;
+  total_ml: number;
+}
+
 export interface SavedMeal {
   id: string;
   user_id: string;

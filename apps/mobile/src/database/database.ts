@@ -78,6 +78,11 @@ export function initDatabase(): DB {
     [],
   );
   db.executeSync(
+    'CREATE INDEX IF NOT EXISTS idx_water_entries_user_date ' +
+      'ON water_entries(user_id, date)',
+    [],
+  );
+  db.executeSync(
     'CREATE TABLE IF NOT EXISTS saved_meals (' +
       'id TEXT PRIMARY KEY, ' +
       'user_id TEXT NOT NULL, ' +

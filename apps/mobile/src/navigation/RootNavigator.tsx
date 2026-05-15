@@ -8,6 +8,7 @@ import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import { FlushTriggers } from '../services/FlushTriggers';
+import WaterScreen from '../screens/WaterScreen';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -85,7 +86,10 @@ export default function RootNavigator() {
             }
           />
         ) : userCheckState === 'exists' ? (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Water" component={WaterScreen} />
+          </>
         ) : (
           <Stack.Screen
             name="Onboarding"
