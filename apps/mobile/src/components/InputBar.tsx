@@ -17,12 +17,14 @@ interface InputBarProps {
   onSubmit: (text: string) => Promise<void>;
   isSubmitting: boolean;
   onChangeText?: (text: string) => void;
+  onBookmarkPress?: () => void;
 }
 
 export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
   onSubmit,
   isSubmitting,
   onChangeText,
+  onBookmarkPress,
 }, ref) {
   const [text, setRawText] = useState('');
   const isDarkMode = useColorScheme() === 'dark';
@@ -65,6 +67,22 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
+      {onBookmarkPress !== undefined && (
+        <Pressable
+          onPress={onBookmarkPress}
+          disabled={isSubmitting}
+          hitSlop={8}
+          style={[
+            styles.bookmarkButton,
+            isDarkMode && styles.bookmarkButtonDark,
+            isSubmitting && styles.buttonDisabled,
+          ]}
+        >
+          <Text style={[styles.bookmarkText, isDarkMode && styles.bookmarkTextDark]}>
+            🔖
+          </Text>
+        </Pressable>
+      )}
       <TextInput
         style={[styles.input, isDarkMode && styles.inputDark]}
         placeholder="What did you eat or do?"
@@ -132,6 +150,25 @@ const styles = StyleSheet.create({
   },
   inputDark: {
     backgroundColor: '#2C2C2E',
+    color: '#FFFFFF',
+  },
+  bookmarkButton: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  bookmarkButtonDark: {
+    backgroundColor: '#2C2C2E',
+  },
+  bookmarkText: {
+    fontSize: 20,
+    color: '#000000',
+  },
+  bookmarkTextDark: {
     color: '#FFFFFF',
   },
   spinner: {

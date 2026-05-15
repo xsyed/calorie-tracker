@@ -44,6 +44,11 @@ export interface FoodItem {
   fat_g: number;
 }
 
+export interface FoodEntryWithItems {
+  entry: FoodEntry;
+  items: FoodItem[];
+}
+
 export interface ExerciseEntry {
   id: string;
   user_id: string;
@@ -65,4 +70,26 @@ export interface WaterEntry {
   date: string;
   amount_ml: number;
   timestamp: string;
+}
+
+export interface SavedMeal {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface SavedMealItem {
+  id: string;
+  saved_meal_id: string;
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export interface SavedMealWithItems {
+  savedMeal: SavedMeal;
+  items: SavedMealItem[];
 }

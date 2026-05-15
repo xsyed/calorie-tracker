@@ -14,14 +14,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useAuth } from '../auth';
+import DailySummary from '../components/DailySummary';
+import DateStrip from '../components/DateStrip';
+import EntryList from '../components/EntryList';
+import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
+import HistorySavedMealsOverlay from '../components/HistorySavedMealsOverlay';
 import InputBar from '../components/InputBar';
 import type { InputBarHandle } from '../components/InputBar';
-import DailySummary from '../components/DailySummary';
-import WaterQuickAdd, { DEFAULT_WATER_GOAL } from '../components/WaterQuickAdd';
-import EntryList from '../components/EntryList';
-import DateStrip from '../components/DateStrip';
 import MonthDropdown from '../components/MonthDropdown';
-import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
+import SaveMealPrompt from '../components/SaveMealPrompt';
+import WaterQuickAdd, { DEFAULT_WATER_GOAL } from '../components/WaterQuickAdd';
 import {
   getUser,
   saveParsedLogEntry,
@@ -35,6 +37,7 @@ import {
   insertWaterEntry,
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
+  saveFoodEntryAsSavedMeal,
 } from '../database';
 import { parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
@@ -137,6 +140,11 @@ export default function HomeScreen() {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [isAddingWater, setIsAddingWater] = useState(false);
+  const [isHistoryOverlayVisible, setHistoryOverlayVisible] = useState(false);
+  const [saveMealEntryId, setSaveMealEntryId] = useState<string | null>(null);
+  const [saveMealName, setSaveMealName] = useState('');
+  const [saveMealError, setSaveMealError] = useState<string | null>(null);
+  const [isSavingMeal, setIsSavingMeal] = useState(false);
 
   useEffect(() => {
     if (auth.user) {
@@ -396,6 +404,65 @@ export default function HomeScreen() {
     // Wired in Task 6.9
   }, []);
 
+  const handleBookmarkPress = useCallback(() => {
+    setHistoryOverlayVisible(true);
+  }, []);
+
+  const handleHistoryOverlayDismiss = useCallback(() => {
+    setHistoryOverlayVisible(false);
+  }, []);
+
+  const handleHistoryOverlayApplied = useCallback(() => {
+    setHistoryOverlayVisible(false);
+    loadDataForDate(selectedDateRef.current);
+  }, [loadDataForDate]);
+
+  const handleOpenSaveMealPrompt = useCallback((entryId: string) => {
+    setSaveMealEntryId(entryId);
+    setSaveMealName('');
+    setSaveMealError(null);
+  }, []);
+
+  const handleCancelSaveMealPrompt = useCallback(() => {
+    if (isSavingMeal) return;
+
+    setSaveMealEntryId(null);
+    setSaveMealName('');
+    setSaveMealError(null);
+  }, [isSavingMeal]);
+
+  const handleChangeSaveMealName = useCallback((name: string) => {
+    setSaveMealName(name);
+    setSaveMealError(null);
+  }, []);
+
+  const handleCreateSavedMeal = useCallback(async () => {
+    const userId = userIdRef.current;
+    const name = saveMealName.trim();
+    if (saveMealEntryId === null || name.length === 0) return;
+
+    if (userId === null) {
+      setSaveMealError('User not found.');
+      return;
+    }
+
+    setIsSavingMeal(true);
+    setSaveMealError(null);
+    try {
+      await saveFoodEntryAsSavedMeal({
+        userId,
+        foodEntryId: saveMealEntryId,
+        name,
+      });
+      setSaveMealEntryId(null);
+      setSaveMealName('');
+    } catch {
+      setSaveMealError('Could not save meal.');
+    } finally {
+      setIsSavingMeal(false);
+    }
+  }, [saveMealEntryId, saveMealName]);
+
   const hasEntries = useMemo(
     () => foodEntries.length > 0 || exerciseEntries.length > 0,
     [foodEntries.length, exerciseEntries.length],
@@ -473,6 +540,7 @@ export default function HomeScreen() {
             <EntryList
               foodEntries={foodEntries}
               exerciseEntries={exerciseEntries}
+              onSaveEntryAsMeal={handleOpenSaveMealPrompt}
             />
           </ScrollView>
         )}
@@ -500,8 +568,27 @@ export default function HomeScreen() {
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           onChangeText={handleChangeText}
+          onBookmarkPress={handleBookmarkPress}
         />
       </View>
+      <HistorySavedMealsOverlay
+        visible={isHistoryOverlayVisible}
+        userId={userIdRef.current}
+        selectedDate={selectedDate}
+        onDismiss={handleHistoryOverlayDismiss}
+        onApplied={handleHistoryOverlayApplied}
+      />
+      {saveMealEntryId !== null && (
+        <SaveMealPrompt
+          isDark={isDarkMode}
+          name={saveMealName}
+          error={saveMealError}
+          isSaving={isSavingMeal}
+          onChangeName={handleChangeSaveMealName}
+          onCancel={handleCancelSaveMealPrompt}
+          onSave={handleCreateSavedMeal}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

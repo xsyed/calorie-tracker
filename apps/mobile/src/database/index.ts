@@ -18,6 +18,26 @@ export {
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
 } from './exerciseRepository';
+export {
+  getCompletedHistoryEntries,
+  getSavedMeals,
+  saveFoodEntryAsSavedMeal,
+  deleteSavedMeal,
+  createFoodEntryFromHistoryEntry,
+  createFoodEntryFromSavedMeal,
+} from './historySavedMealsRepository';
 export { getSetting, setSetting } from './appSettingsRepository';
 export { insertWaterEntry, getWaterEntriesByDate, getDailyWaterTotal } from './waterRepository';
-export type { User, OnboardingFormData, FoodEntry, FoodItem, ExerciseEntry, AppSetting, WaterEntry } from './types';
+export type {
+  User,
+  OnboardingFormData,
+  FoodEntry,
+  FoodEntryWithItems,
+  FoodItem,
+  ExerciseEntry,
+  AppSetting,
+  WaterEntry,
+  SavedMeal,
+  SavedMealItem,
+  SavedMealWithItems,
+} from './types';

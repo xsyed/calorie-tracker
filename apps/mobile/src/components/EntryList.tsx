@@ -28,6 +28,7 @@ interface EntryListProps {
   exerciseEntries: EntryListExerciseEntry[];
   onRetryEntry?: (entryId: string) => void;
   onEditEntry?: (entryId: string) => void;
+  onSaveEntryAsMeal?: (entryId: string) => void;
 }
 
 type TimelineItem =
@@ -97,6 +98,7 @@ export default function EntryList({
   exerciseEntries,
   onRetryEntry,
   onEditEntry,
+  onSaveEntryAsMeal,
 }: EntryListProps) {
   const isDark = useColorScheme() === 'dark';
 
@@ -133,7 +135,7 @@ export default function EntryList({
       </Text>
       {timeline.map((item, _index) => {
         if (item.type === 'food') {
-          return renderFoodEntry(item.entry, isDark, onRetryEntry, onEditEntry);
+          return renderFoodEntry(item.entry, isDark, onRetryEntry, onEditEntry, onSaveEntryAsMeal);
         }
         return renderExerciseEntry(item.entry, isDark);
       })}
@@ -146,11 +148,13 @@ function renderFoodEntry(
   isDark: boolean,
   onRetryEntry?: (entryId: string) => void,
   onEditEntry?: (entryId: string) => void,
+  onSaveEntryAsMeal?: (entryId: string) => void,
 ) {
   const isFailed = entry.status === 'failed';
   const isPending = entry.status === 'pending';
   const isDimmed = isFailed || isPending;
   const isPressable = isFailed && onRetryEntry !== undefined;
+  const canSaveAsMeal = isCompleteEntry(entry) && entry.items.length > 0 && onSaveEntryAsMeal !== undefined;
 
   const content = (
     <View style={[styles.card, isDark && styles.cardDark]}>
@@ -199,6 +203,18 @@ function renderFoodEntry(
           Tap to retry or edit
         </Text>
       )}
+
+      {canSaveAsMeal && (
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => onSaveEntryAsMeal(entry.id)}
+            hitSlop={8}
+          >
+            <Text style={styles.actionButtonText}>Save as Meal</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 
@@ -210,6 +226,18 @@ function renderFoodEntry(
           onRetryEntry?.(entry.id);
           onEditEntry?.(entry.id);
         }}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  if (canSaveAsMeal) {
+    return (
+      <Pressable
+        key={`food-${entry.id}`}
+        onLongPress={() => onSaveEntryAsMeal(entry.id)}
+        delayLongPress={350}
       >
         {content}
       </Pressable>
@@ -308,6 +336,22 @@ const styles = StyleSheet.create({
   },
   processingTextDark: {
     color: '#666666',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+  },
+  actionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   emptyTitle: {
     fontSize: 16,

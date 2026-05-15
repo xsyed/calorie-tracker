@@ -77,5 +77,28 @@ export function initDatabase(): DB {
       ')',
     [],
   );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS saved_meals (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'name TEXT NOT NULL, ' +
+      'created_at TEXT NOT NULL, ' +
+      'FOREIGN KEY (user_id) REFERENCES User(id)' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS saved_meal_items (' +
+      'id TEXT PRIMARY KEY, ' +
+      'saved_meal_id TEXT NOT NULL, ' +
+      'name TEXT NOT NULL, ' +
+      'calories REAL NOT NULL, ' +
+      'protein_g REAL NOT NULL, ' +
+      'carbs_g REAL NOT NULL, ' +
+      'fat_g REAL NOT NULL, ' +
+      'FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id)' +
+      ')',
+    [],
+  );
   return db;
 }
