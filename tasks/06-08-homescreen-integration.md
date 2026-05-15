@@ -10,7 +10,7 @@
 
 | Item | Current state |
 |------|---------------|
-| `HomeScreen.tsx` | 342 lines. Has `getTodayDate()` (lines 19-25), `handleSubmit()` (lines 146-233), auth integration via `useAuth()`, `InputBar` with voice input. Stubs at lines 251-253: `<View style={styles.summaryPlaceholder} />` and `<View style={styles.entryListPlaceholder} />`. |
+| `HomeScreen.tsx` | Has `getTodayDate()`, `handleSubmit()`, auth integration via `useAuth()`, and `InputBar`. |
 | State variables | 4 state vars + 3 refs: `isSubmitting`, `error`, `userIdRef`, `errorTimerRef`, `inputBarRef`. No date/data state. |
 | Imports | Already imports from `../database`: `getUser, saveParsedLogEntry, insertFoodEntry, getSetting`. Need to add: `getFoodEntriesByDate, getFoodItemsByEntryId, getDailyCalorieTotals, getLoggedDatesInRange, getDailyWaterTotal, insertWaterEntry` and from `../database/exerciseRepository`: `getExerciseEntriesByDate, getDailyExerciseCalories` (or via index). |
 | Layout | `KeyboardAvoidingView` → `View[content]` → `View[header]` + `View[summaryPlaceholder]` + `View[entryListPlaceholder]` → `View[errorBanner]` → `InputBar`. |
@@ -401,7 +401,6 @@ const onDateSelect = useCallback((date: string) => {
 ## Step 8: Preserve existing features
 
 DO NOT modify or remove:
-- Voice input wiring (mic button, partial text, final text → InputBar) — lines 108-144
 - Error auto-dismiss after 5 seconds — lines 93-106
 - handleSubmit rate-limit check, LLM parse, DB save — lines 146-233 (only change `getTodayDate()` → `selectedDateRef.current`)
 - KeyboardAvoidingView behavior — lines 239-283 (outer wrapper)
@@ -463,5 +462,5 @@ Note: `ActivityIndicator` and `Pressable` likely need to be added to the existin
 - [ ] Null targets show "Set up your daily target" messages
 - [ ] Dark mode renders correctly across all integrated components
 - [ ] ScrollView scrolls entire content; InputBar stays fixed at bottom
-- [ ] No visual regression in existing InputBar/voice behavior
+- [ ] No visual regression in existing InputBar behavior
 - [ ] `summaryPlaceholder` and `entryListPlaceholder` stubs removed

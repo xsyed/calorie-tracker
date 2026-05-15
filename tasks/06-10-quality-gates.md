@@ -63,7 +63,6 @@ Common issues to look for:
 - [ ] Settings → Home: data refreshes (user targets updated)
 - [ ] Empty state: navigate to date with no entries → see empty state messages
 - [ ] Dark mode: all components render correctly in dark mode
-- [ ] Voice input: mic button works (if available on device)
 - [ ] Error state: simulate DB error → see error banner with retry
 - [ ] Pending entries in list: shown dimmed with "Pending" badge
 - [ ] Failed entries in list: shown dimmed with "Failed" badge

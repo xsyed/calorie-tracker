@@ -1,7 +1,7 @@
 # TDD: Home Screen & Daily Summary
 
 ## Feature Summary
-The primary screen after login/onboarding. Shows a 7-day date strip with colored dots indicating logged days, a month dropdown for navigating to any date, and a daily summary with calories and macro progress bars. Below the summary: today's entries list (FoodEntries, ExerciseEntries, water quick-add). Input bar at the bottom for text/voice logging. Water quick-add buttons (+200ml, +500ml).
+The primary screen after login/onboarding. Shows a 7-day date strip with colored dots indicating logged days, a month dropdown for navigating to any date, and a daily summary with calories and macro progress bars. Below the summary: today's entries list (FoodEntries, ExerciseEntries, water quick-add). Input bar at the bottom for text logging. Water quick-add buttons (+200ml, +500ml).
 
 ---
 

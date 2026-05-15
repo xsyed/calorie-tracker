@@ -36,7 +36,7 @@ import {
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
 } from '../database';
-import { useVoiceInput, parseFoodText } from '../services';
+import { parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
 
 function getTodayDate(): string {
@@ -77,32 +77,6 @@ function getMonthRange(date: string): { startDate: string; endDate: string } {
     startDate: formatYYYYMMDD(new Date(year, month, 1)),
     endDate: formatYYYYMMDD(new Date(year, month + 1, 0)),
   };
-}
-
-function mapVoiceError(error: string): string {
-  if (error.includes('Microphone access')) {
-    return 'Microphone access needed. Enable in Settings.';
-  }
-  if (
-    error.includes('unavailable') ||
-    error.includes('Speech recognition')
-  ) {
-    return 'Voice input not available for your device language.';
-  }
-  if (
-    error === '7' ||
-    error.includes('no match') ||
-    error.includes('No match')
-  ) {
-    return "Didn't catch that. Tap mic to try again.";
-  }
-  if (error.includes('busy') || error.includes('Busy')) {
-    return 'Cannot use mic while another app is using it.';
-  }
-  if (error.includes('network') || error.includes('Network')) {
-    return 'Voice input needs internet.';
-  }
-  return error;
 }
 
 function mapErrorToUserMessage(code: ParseErrorCode): string {
@@ -164,27 +138,6 @@ export default function HomeScreen() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [isAddingWater, setIsAddingWater] = useState(false);
 
-  const voice = useVoiceInput();
-
-  const onMicPress = useCallback(() => {
-    switch (voice.status) {
-      case 'idle':
-      case 'stopped':
-      case 'error':
-        voice.startListening();
-        break;
-      case 'listening':
-      case 'processing':
-        voice.stopListening();
-        break;
-    }
-  }, [voice.status, voice.startListening, voice.stopListening]);
-
-  const isVoiceAvailable = useMemo(
-    () => voice.isAvailable && !isSubmitting,
-    [voice.isAvailable, isSubmitting],
-  );
-
   useEffect(() => {
     if (auth.user) {
       getUser(auth.user.uid).then((user) => {
@@ -192,25 +145,6 @@ export default function HomeScreen() {
       });
     }
   }, [auth.user?.uid]);
-
-  useEffect(() => {
-    if (voice.status !== 'stopped' || voice.finalText === null) return;
-
-    if (voice.finalText.length === 0) {
-      setError("Didn't catch that. Tap mic to try again.");
-      voice.clearFinalText();
-      return;
-    }
-
-    inputBarRef.current?.setText(voice.finalText);
-    voice.clearFinalText();
-  }, [voice.status, voice.finalText, voice.clearFinalText]);
-
-  useEffect(() => {
-    if (voice.error !== null) {
-      setError(mapVoiceError(voice.error));
-    }
-  }, [voice.error]);
 
   useEffect(() => {
     if (error !== null) {
@@ -566,10 +500,6 @@ export default function HomeScreen() {
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
           onChangeText={handleChangeText}
-          voiceStatus={voice.status}
-          voicePartialText={voice.partialText}
-          isVoiceAvailable={isVoiceAvailable}
-          onMicPress={onMicPress}
         />
       </View>
     </KeyboardAvoidingView>

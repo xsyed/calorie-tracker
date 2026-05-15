@@ -10,7 +10,7 @@
 
 | Item | Current state |
 |------|---------------|
-| Existing components | Only `InputBar.tsx` (269 lines) and `WaveformIndicator.tsx` (83 lines). Both use `useColorScheme()`, `StyleSheet.create()`, plain RN Views. |
+| Existing components | `InputBar.tsx` uses `useColorScheme()`, `StyleSheet.create()`, plain RN Views. |
 | Dark mode pattern | `const isDarkMode = useColorScheme() === 'dark'` then conditional style arrays: `[styles.foo, isDarkMode && styles.fooDark]`. |
 | Button sizing | `InputBar.tsx` uses `minHeight: 44` implicitly via padding. Mic button is 36x36 with borderRadius 18. Send button is pill-shaped `borderRadius: 20`. |
 | Color palette (from existing code) | Light: bg `#FFFFFF`, text `#000000`, border `#CCCCCC`, filled bg `#F0F0F0`. Dark: bg `#1C1C1E`/`#000000`, text `#FFFFFF`, border `#333333`, filled bg `#2C2C2E`/`#3A3A3C`. Blue accent: `#007AFF` light / `#0A84FF` dark. |

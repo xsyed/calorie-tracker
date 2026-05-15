@@ -9,9 +9,3 @@ export type {
   ParseErrorCode,
 } from './llmService';
 export { flushQueue } from './queueFlusher';
-export { useVoiceInput } from './voiceService';
-export type {
-  VoiceInputStatus,
-  VoiceInputState,
-  VoiceInputActions,
-} from './voiceService';

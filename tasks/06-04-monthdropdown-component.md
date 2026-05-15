@@ -10,7 +10,7 @@
 
 | Item | Current state |
 |------|---------------|
-| Existing components | Only `InputBar.tsx` and `WaveformIndicator.tsx`. Both use `Pressable`, `StyleSheet`, `useColorScheme`. |
+| Existing components | `InputBar.tsx` uses `Pressable`, `StyleSheet`, `useColorScheme`. |
 | Dropdown/overlay pattern | No existing dropdown/modal components. Must build from scratch using absolute positioning. |
 | Dark mode | `const isDarkMode = useColorScheme() === 'dark'`, conditional style arrays. |
 | Date format | `YYYY-MM-DD`. |

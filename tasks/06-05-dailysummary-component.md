@@ -10,7 +10,7 @@
 
 | Item | Current state |
 |------|---------------|
-| Existing components | `InputBar.tsx` (269 lines) and `WaveformIndicator.tsx`. Both use conditional `StyleSheet` arrays for dark mode. |
+| Existing components | `InputBar.tsx` uses conditional `StyleSheet` arrays for dark mode. |
 | Progress bar pattern | No existing progress bar component. Must build from scratch using nested `View`s with percentage-based width. |
 | Color usage | `InputBar.tsx` uses `#007AFF` / `#0A84FF` (blue), `#FFFFFF` / `#000000` (text), `#F0F0F0` / `#2C2C2E` (input bg). Dark mode: `#1C1C1E` (bg), `#3A3A3C` (button bg). |
 | User targets | Available from `userRepository.getUser()` → `user.daily_target_calories`, `user.protein_g`, `user.carbs_g`, `user.fat_g`. All nullable (`number | null`). |

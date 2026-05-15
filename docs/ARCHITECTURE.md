@@ -1,6 +1,6 @@
 # System Architecture — Calories App
 
-A mobile calorie tracker using LLM-powered food/exercise parsing from freeform text or dictation, with water and weight tracking. Offline-first UX backed by a thin server-side proxy.
+A mobile calorie tracker using LLM-powered food/exercise parsing from freeform text, with water and weight tracking. Offline-first UX backed by a thin server-side proxy.
 
 ---
 
@@ -11,7 +11,7 @@ A mobile calorie tracker using LLM-powered food/exercise parsing from freeform t
 │                                                                          │
 │  ┌─ Navigation ───────────────────────────────────────────────────────┐ │
 │  │  Bottom Tabs: [Home]  [Weight]                                     │ │
-│  │  Home: 7-day strip + month dropdown + text/voice input bar         │ │
+│  │  Home: 7-day strip + month dropdown + text input bar               │ │
 │  │  Overlays: History / Saved Meals (triggered from input bar)        │ │
 │  │  Settings: gear icon in header                                     │ │
 │  │  Water: dedicated screen, reached from Home (not a tab)            │ │
@@ -24,7 +24,6 @@ A mobile calorie tracker using LLM-powered food/exercise parsing from freeform t
 │                                                                          │
 │  ┌─ Services ─────────────────────────────────────────────────────────┐ │
 │  │  LLM Proxy:  raw text → backend → OpenRouter (Gemini Flash)        │ │
-│  │  Voice:      react-native-voice → speech-to-text → LLM pipeline    │ │
 │  │  Auth:       Firebase Auth (Google + Apple sign-in only)           │ │
 │  │  Backup:     Google Drive AppData — file-level SQLite backup       │ │
 │  │  Reminders:  local notifications, user-configured fixed times      │ │
@@ -60,7 +59,6 @@ A mobile calorie tracker using LLM-powered food/exercise parsing from freeform t
 | Backend host | Fly.io | Specified in design decision #7 |
 | Android backup | Google Drive AppData (file-level) | Specified in design decision #1 |
 | iOS backup | iCloud (planned, not initial) | Specified in design decision #1 |
-| Voice dictation | react-native-voice | Specified in architecture diagram |
 | Connectivity detection | react-native-netinfo | Specified in design decision #10 |
 | Local notifications | React Native local notifications | Specified in architecture diagram |
 
@@ -86,7 +84,7 @@ Onboarding
   │
   ▼ (authenticated, returning user)
 Home Screen
-  ├── [input bar] ──▶ text entry or voice dictation
+  ├── [input bar] ──▶ text entry
   ├── [bookmark icon] ──▶ History / Saved Meals overlay
   ├── [7-day strip] ──▶ select date (colored dots = logged days)
   ├── [month dropdown] ──▶ month-at-a-glance, navigate to any date
@@ -277,22 +275,7 @@ Queue flusher iterates pending entries:
 Home screen updates: pending badges replaced with macro data
 ```
 
-### 6.3 Voice Input Flow
-
-```
-User taps microphone button on Home input bar
-        │
-        ▼
-react-native-voice captures speech → returns text
-        │
-        ▼
-Text inserted into input bar (editable before submission)
-        │
-        ▼
-User submits → same LLM pipeline as typed input (6.1 or 6.2)
-```
-
-### 6.4 Backup Flow
+### 6.3 Backup Flow
 
 ```
 User triggers manual backup from Settings
@@ -428,7 +411,7 @@ All decisions below are sourced from `research/design-decisions.md`.
 ┌─────────────────────────────────┐
 │  Logging Context                │
 │  FoodEntry, FoodItem, LLM parse │
-│  Offline queue, Voice input     │
+│  Offline queue                  │
 │  History, SavedMeals            │
 ├─────────────────────────────────┤
 │  Tracking Context               │

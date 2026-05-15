@@ -1,6 +1,6 @@
 # Calories App
 
-A mobile calorie tracker that uses LLM-powered food/exercise parsing from freeform text or dictation, with water and weight tracking.
+A mobile calorie tracker that uses LLM-powered food/exercise parsing from freeform text, with water and weight tracking.
 
 ## Language
 

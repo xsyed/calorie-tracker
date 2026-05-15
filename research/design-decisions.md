@@ -41,7 +41,7 @@ Interview date: 2026-05-10. Domain: mobile calorie tracker with LLM food/exercis
 
 **Decision:** Auto-detect. LLM returns JSON with `foods[]` and `exercises[]` arrays (either or both can be populated). The raw prompt is shared; the app creates one `FoodEntry` (containing multiple `FoodItems`) plus one `ExerciseEntry` as needed. Empty arrays = unrecognizable input, show retry prompt.
 
-**Why it matters:** The input UX stays dead simple — one text field, one microphone button. No mode switching. The LLM prompt does the classification work.
+**Why it matters:** The input UX stays dead simple — one text field. No mode switching. The LLM prompt does the classification work.
 
 ---
 
@@ -170,7 +170,6 @@ Interview date: 2026-05-10. Domain: mobile calorie tracker with LLM food/exercis
 │  └──────────────────────────────────────────────────┘│
 │  ┌─ Services ───────────────────────────────────────┐│
 │  │  LLM: send raw text → backend proxy → OpenRouter ││
-│  │  Voice: react-native-voice → text → LLM pipeline ││
 │  │  Auth: Firebase Auth (Google + Apple sign-in)    ││
 │  │  Backup: Google Drive AppData (file-level)       ││
 │  │  Reminders: local notifications, fixed times     ││
