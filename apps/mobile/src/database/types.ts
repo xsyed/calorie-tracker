@@ -58,3 +58,11 @@ export interface AppSetting {
   key: string;
   value: string;
 }
+
+export interface WaterEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  amount_ml: number;
+  timestamp: string;
+}

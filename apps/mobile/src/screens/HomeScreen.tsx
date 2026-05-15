@@ -1,18 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useAuth } from '../auth';
 import InputBar from '../components/InputBar';
 import type { InputBarHandle } from '../components/InputBar';
-import { getUser, saveParsedLogEntry, insertFoodEntry, getSetting } from '../database';
+import DailySummary from '../components/DailySummary';
+import WaterQuickAdd, { DEFAULT_WATER_GOAL } from '../components/WaterQuickAdd';
+import EntryList from '../components/EntryList';
+import DateStrip from '../components/DateStrip';
+import MonthDropdown from '../components/MonthDropdown';
+import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
+import {
+  getUser,
+  saveParsedLogEntry,
+  insertFoodEntry,
+  getSetting,
+  getFoodEntriesByDate,
+  getFoodItemsByEntryId,
+  getDailyCalorieTotals,
+  getLoggedDatesInRange,
+  getDailyWaterTotal,
+  insertWaterEntry,
+  getExerciseEntriesByDate,
+  getDailyExerciseCalories,
+} from '../database';
 import { useVoiceInput, parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
 
@@ -22,6 +45,38 @@ function getTodayDate(): string {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatYYYYMMDD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getDateStripRange(date: string): { startDate: string; endDate: string } {
+  const end = new Date(date + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (end > today) {
+    end.setTime(today.getTime());
+  }
+  const start = new Date(end);
+  start.setDate(start.getDate() - 6);
+  return {
+    startDate: formatYYYYMMDD(start),
+    endDate: formatYYYYMMDD(end),
+  };
+}
+
+function getMonthRange(date: string): { startDate: string; endDate: string } {
+  const selected = new Date(date + 'T00:00:00');
+  const year = selected.getFullYear();
+  const month = selected.getMonth();
+  return {
+    startDate: formatYYYYMMDD(new Date(year, month, 1)),
+    endDate: formatYYYYMMDD(new Date(year, month + 1, 0)),
+  };
 }
 
 function mapVoiceError(error: string): string {
@@ -85,6 +140,30 @@ export default function HomeScreen() {
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputBarRef = useRef<InputBarHandle>(null);
 
+  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const selectedDateRef = useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
+  const [userTargets, setUserTargets] = useState<{
+    dailyCalories: number | null;
+    proteinG: number | null;
+    carbsG: number | null;
+    fatG: number | null;
+  } | null>(null);
+  const [dailyTotals, setDailyTotals] = useState({
+    totalCalories: 0,
+    totalProtein: 0,
+    totalCarbs: 0,
+    totalFat: 0,
+  });
+  const [foodEntries, setFoodEntries] = useState<EntryListFoodEntry[]>([]);
+  const [exerciseEntries, setExerciseEntries] = useState<EntryListExerciseEntry[]>([]);
+  const [dailyWaterTotal, setDailyWaterTotal] = useState(0);
+  const [exerciseCalories, setExerciseCalories] = useState(0);
+  const [loggedDates, setLoggedDates] = useState<Set<string>>(new Set());
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [isAddingWater, setIsAddingWater] = useState(false);
+
   const voice = useVoiceInput();
 
   const onMicPress = useCallback(() => {
@@ -143,6 +222,114 @@ export default function HomeScreen() {
     };
   }, [error]);
 
+  const loadDataForDate = useCallback(async (date: string) => {
+    const uid = userIdRef.current;
+    if (uid === null) return;
+
+    setDataLoading(true);
+    setDataError(null);
+
+    try {
+      const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal] =
+        await Promise.all([
+          getUser(uid),
+          getFoodEntriesByDate(uid, date),
+          getExerciseEntriesByDate(uid, date),
+          getDailyExerciseCalories(uid, date),
+          getDailyWaterTotal(uid, date),
+        ]);
+
+      setUserTargets({
+        dailyCalories: user?.daily_target_calories ?? null,
+        proteinG: user?.protein_g ?? null,
+        carbsG: user?.carbs_g ?? null,
+        fatG: user?.fat_g ?? null,
+      });
+
+      setExerciseCalories(exerciseCals);
+      setDailyWaterTotal(waterTotal);
+
+      const entriesWithItems: EntryListFoodEntry[] = [];
+      for (const entry of foodEntriesResult) {
+        const items = await getFoodItemsByEntryId(entry.id);
+        entriesWithItems.push({
+          id: entry.id,
+          rawText: entry.raw_text,
+          status: entry.status,
+          createdAt: entry.created_at,
+          items: items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            calories: item.calories,
+            proteinG: item.protein_g,
+            carbsG: item.carbs_g,
+            fatG: item.fat_g,
+          })),
+        });
+      }
+      setFoodEntries(entriesWithItems);
+
+      setExerciseEntries(
+        exerciseEntriesResult.map((entry) => ({
+          id: entry.id,
+          type: entry.exercise_type,
+          durationMinutes: entry.duration_minutes,
+          caloriesBurned: entry.calories_burned,
+          timestamp: entry.timestamp,
+        })),
+      );
+
+      const totals = await getDailyCalorieTotals(uid, date);
+      setDailyTotals({
+        totalCalories: totals.total_calories,
+        totalProtein: totals.total_protein,
+        totalCarbs: totals.total_carbs,
+        totalFat: totals.total_fat,
+      });
+
+      const stripRange = getDateStripRange(date);
+      const monthRange = getMonthRange(date);
+      const [stripDates, monthDates] = await Promise.all([
+        getLoggedDatesInRange(uid, stripRange.startDate, stripRange.endDate),
+        getLoggedDatesInRange(uid, monthRange.startDate, monthRange.endDate),
+      ]);
+      setLoggedDates(new Set([...stripDates, ...monthDates]));
+    } catch {
+      setDataError('Something went wrong. Please try again.');
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (userIdRef.current !== null) {
+      loadDataForDate(getTodayDate());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadDataForDate(selectedDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const uid = userIdRef.current;
+      if (uid === null) return;
+      getUser(uid).then((user) => {
+        if (user) {
+          setUserTargets({
+            dailyCalories: user.daily_target_calories ?? null,
+            proteinG: user.protein_g ?? null,
+            carbsG: user.carbs_g ?? null,
+            fatG: user.fat_g ?? null,
+          });
+        }
+      }).catch(() => {});
+    }, [])
+  );
+
   const handleSubmit = useCallback(
     async (text: string): Promise<void> => {
       if (text.trim().length === 0) return;
@@ -157,7 +344,7 @@ export default function HomeScreen() {
           try {
             await insertFoodEntry({
               user_id: userId,
-              date: getTodayDate(),
+              date: selectedDateRef.current,
               raw_text: text,
               status: 'pending',
               retry_count: 0,
@@ -187,7 +374,7 @@ export default function HomeScreen() {
         try {
           await saveParsedLogEntry({
             userId,
-            date: getTodayDate(),
+            date: selectedDateRef.current,
             rawText: text,
             foods: result.foods,
             exercises: result.exercises.map((e) => ({
@@ -203,6 +390,7 @@ export default function HomeScreen() {
         }
 
         setSubmitting(false);
+        loadDataForDate(selectedDateRef.current);
       } else {
         if (result.error === 'no_network') {
           const userId = userIdRef.current;
@@ -210,7 +398,7 @@ export default function HomeScreen() {
             try {
               await insertFoodEntry({
                 user_id: userId,
-                date: getTodayDate(),
+                date: selectedDateRef.current,
                 raw_text: text,
                 status: 'pending',
                 retry_count: 0,
@@ -229,12 +417,61 @@ export default function HomeScreen() {
         throw new Error(message);
       }
     },
-    [],
+    [loadDataForDate],
   );
 
   const handleChangeText = useCallback(() => {
     setError(null);
   }, []);
+
+  const handleAddWater = useCallback(async (amountMl: number) => {
+    const uid = userIdRef.current;
+    if (uid === null) return;
+    setIsAddingWater(true);
+    try {
+      await insertWaterEntry({
+        user_id: uid,
+        date: selectedDate,
+        amount_ml: amountMl,
+        timestamp: new Date().toISOString(),
+      });
+      const total = await getDailyWaterTotal(uid, selectedDate);
+      setDailyWaterTotal(total);
+    } finally {
+      setIsAddingWater(false);
+    }
+  }, [selectedDate]);
+
+  const onDateSelect = useCallback((date: string) => {
+    setSelectedDate(date);
+  }, []);
+
+  const handleVisibleRangeChange = useCallback(async (startDate: string, endDate: string) => {
+    const uid = userIdRef.current;
+    if (uid === null) return;
+
+    try {
+      const dates = await getLoggedDatesInRange(uid, startDate, endDate);
+      setLoggedDates((prev) => new Set([...prev, ...dates]));
+    } catch {
+      // Month dots are secondary; the main date data loader owns visible errors.
+    }
+  }, []);
+
+  const handleSettingsPress = useCallback(() => {
+    // Wired in Task 6.9
+  }, []);
+
+  const hasEntries = useMemo(
+    () => foodEntries.length > 0 || exerciseEntries.length > 0,
+    [foodEntries.length, exerciseEntries.length],
+  );
+
+  const dateLabel = useMemo(() => {
+    if (selectedDate === getTodayDate()) return 'Today';
+    const d = new Date(selectedDate + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }, [selectedDate]);
 
   return (
     <KeyboardAvoidingView
@@ -243,13 +480,68 @@ export default function HomeScreen() {
     >
       <View style={[styles.content, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={[styles.headerText, isDarkMode && styles.headerTextDark]}>
-            Home
-          </Text>
+          <View style={styles.headerRow}>
+            <MonthDropdown
+              selectedDate={selectedDate}
+              loggedDates={loggedDates}
+              onDateSelect={onDateSelect}
+              onVisibleRangeChange={handleVisibleRangeChange}
+            />
+            <Pressable onPress={handleSettingsPress} hitSlop={8}>
+              <View style={[styles.gearIcon, isDarkMode && styles.gearIconDark]}>
+                <Text style={[styles.gearIconText, isDarkMode && styles.gearIconTextDark]}>⚙</Text>
+              </View>
+            </Pressable>
+          </View>
+          <DateStrip
+            selectedDate={selectedDate}
+            loggedDates={loggedDates}
+            onDateSelect={onDateSelect}
+          />
         </View>
 
-        <View style={styles.summaryPlaceholder} />
-        <View style={styles.entryListPlaceholder} />
+        {dataLoading ? (
+          <ActivityIndicator
+            size="large"
+            style={styles.loader}
+            color={isDarkMode ? '#FFFFFF' : '#000000'}
+          />
+        ) : dataError !== null ? (
+          <View style={styles.errorState}>
+            <Text style={[styles.errorStateText, isDarkMode && styles.errorStateTextDark]}>
+              {dataError}
+            </Text>
+            <Pressable onPress={() => loadDataForDate(selectedDate)} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer}>
+            <DailySummary
+              totalCalories={dailyTotals.totalCalories}
+              totalProtein={dailyTotals.totalProtein}
+              totalCarbs={dailyTotals.totalCarbs}
+              totalFat={dailyTotals.totalFat}
+              targetCalories={userTargets?.dailyCalories ?? null}
+              targetProtein={userTargets?.proteinG ?? null}
+              targetCarbs={userTargets?.carbsG ?? null}
+              targetFat={userTargets?.fatG ?? null}
+              exerciseCalories={exerciseCalories}
+              dateLabel={dateLabel}
+              hasEntries={hasEntries}
+            />
+            <WaterQuickAdd
+              dailyTotal={dailyWaterTotal}
+              waterGoal={DEFAULT_WATER_GOAL}
+              onAddWater={handleAddWater}
+              isAdding={isAddingWater}
+            />
+            <EntryList
+              foodEntries={foodEntries}
+              exerciseEntries={exerciseEntries}
+            />
+          </ScrollView>
+        )}
       </View>
 
       {error !== null && (
@@ -296,23 +588,73 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    zIndex: 10,
+    elevation: 10,
   },
-  headerText: {
-    fontSize: 28,
-    fontWeight: '700',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  gearIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  gearIconDark: {
+    backgroundColor: '#2C2C2E',
+  },
+  gearIconText: {
+    fontSize: 20,
     color: '#000000',
   },
-  headerTextDark: {
+  gearIconTextDark: {
     color: '#FFFFFF',
   },
-  summaryPlaceholder: {
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  errorStateText: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  errorStateTextDark: {
+    color: '#999999',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  scrollContent: {
     flex: 1,
   },
-  entryListPlaceholder: {
-    flex: 2,
+  scrollContentContainer: {
+    padding: 16,
+    gap: 16,
+    paddingBottom: 32,
   },
   errorBanner: {
     paddingHorizontal: 16,

@@ -67,5 +67,15 @@ export function initDatabase(): DB {
       ')',
     [],
   );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS water_entries (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'date TEXT NOT NULL, ' +
+      'amount_ml REAL NOT NULL, ' +
+      'timestamp TEXT NOT NULL' +
+      ')',
+    [],
+  );
   return db;
 }

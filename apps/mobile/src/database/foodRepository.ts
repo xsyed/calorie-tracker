@@ -191,6 +191,56 @@ export async function completePendingEntry(
   }
 }
 
+interface DailyTotals {
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+}
+
+export async function getDailyCalorieTotals(
+  userId: string,
+  date: string,
+): Promise<DailyTotals> {
+  const db = initDatabase();
+  const result = await db.execute(
+    `SELECT
+       COALESCE(SUM(fi.calories), 0) AS total_calories,
+       COALESCE(SUM(fi.protein_g), 0) AS total_protein,
+       COALESCE(SUM(fi.carbs_g), 0) AS total_carbs,
+       COALESCE(SUM(fi.fat_g), 0) AS total_fat
+     FROM food_entries fe
+     JOIN food_items fi ON fi.food_entry_id = fe.id
+     WHERE fe.user_id = ? AND fe.date = ? AND fe.status = 'complete'`,
+    [userId, date],
+  );
+  const row = result.rows[0] as Record<string, unknown> | undefined;
+  return {
+    total_calories: (row?.total_calories as number) ?? 0,
+    total_protein: (row?.total_protein as number) ?? 0,
+    total_carbs: (row?.total_carbs as number) ?? 0,
+    total_fat: (row?.total_fat as number) ?? 0,
+  };
+}
+
+export async function getLoggedDatesInRange(
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<string[]> {
+  const db = initDatabase();
+  const result = await db.execute(
+    `SELECT DISTINCT date
+     FROM food_entries
+     WHERE user_id = ? AND date BETWEEN ? AND ? AND status = 'complete'
+     ORDER BY date ASC`,
+    [userId, startDate, endDate],
+  );
+  return (result.rows as Record<string, unknown>[]).map(
+    (row) => row.date as string,
+  );
+}
+
 export async function saveParsedLogEntry(params: {
   userId: string;
   date: string;

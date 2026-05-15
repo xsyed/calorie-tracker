@@ -11,7 +11,11 @@
     }
   },
   "ignoreIssues": {
-    "apps/mobile/src/components/InputBar.tsx": ["types"]
+    "apps/mobile/src/components/InputBar.tsx": ["types"],
+    "apps/mobile/src/components/DailySummary.tsx": ["files"],
+    "apps/mobile/src/components/DateStrip.tsx": ["files"],
+    "apps/mobile/src/components/MonthDropdown.tsx": ["files"],
+    "apps/mobile/src/components/WaterQuickAdd.tsx": ["files"]
   },
   "ignoreDependencies": ["lint-staged", "@babel/runtime"],
   "ignoreBinaries": ["semgrep", "prettier"]

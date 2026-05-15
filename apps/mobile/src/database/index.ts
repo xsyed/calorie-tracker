@@ -10,6 +10,8 @@ export {
   incrementRetryCount,
   saveParsedLogEntry,
   completePendingEntry,
+  getDailyCalorieTotals,
+  getLoggedDatesInRange,
 } from './foodRepository';
 export {
   insertExerciseEntry,
@@ -17,4 +19,5 @@ export {
   getDailyExerciseCalories,
 } from './exerciseRepository';
 export { getSetting, setSetting } from './appSettingsRepository';
-export type { User, OnboardingFormData, FoodEntry, FoodItem, ExerciseEntry, AppSetting } from './types';
+export { insertWaterEntry, getWaterEntriesByDate, getDailyWaterTotal } from './waterRepository';
+export type { User, OnboardingFormData, FoodEntry, FoodItem, ExerciseEntry, AppSetting, WaterEntry } from './types';
