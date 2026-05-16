@@ -125,6 +125,8 @@ export default function HomeScreen() {
   const [isSubmitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
+  const firebaseUidRef = useRef<string | null>(null);
+  const [userReadyVersion, setUserReadyVersion] = useState(0);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputBarRef = useRef<InputBarHandle>(null);
 
@@ -160,9 +162,17 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (auth.user) {
+      firebaseUidRef.current = auth.user.uid;
       getUser(auth.user.uid).then((user) => {
-        if (user) userIdRef.current = user.id;
+        if (user) {
+          userIdRef.current = user.id;
+          setUserReadyVersion((version) => version + 1);
+        }
       });
+    } else {
+      firebaseUidRef.current = null;
+      userIdRef.current = null;
+      setUserReadyVersion((version) => version + 1);
     }
   }, [auth.user?.uid]);
 
@@ -178,7 +188,8 @@ export default function HomeScreen() {
 
   const loadDataForDate = useCallback(async (date: string) => {
     const uid = userIdRef.current;
-    if (uid === null) return;
+    const firebaseUid = firebaseUidRef.current;
+    if (uid === null || firebaseUid === null) return;
 
     setDataLoading(true);
     setDataError(null);
@@ -186,7 +197,7 @@ export default function HomeScreen() {
     try {
       const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal, dailyWaterGoal] =
         await Promise.all([
-          getUser(uid),
+          getUser(firebaseUid),
           getFoodEntriesByDate(uid, date),
           getExerciseEntriesByDate(uid, date),
           getDailyExerciseCalories(uid, date),
@@ -258,16 +269,9 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    if (userIdRef.current !== null) {
-      loadDataForDate(getTodayDate());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     loadDataForDate(selectedDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [selectedDate, userReadyVersion]);
 
   useFocusEffect(
     useCallback(() => {
@@ -414,8 +418,8 @@ export default function HomeScreen() {
   }, []);
 
   const handleSettingsPress = useCallback(() => {
-    // Wired in Task 6.9
-  }, []);
+    navigation.navigate('Settings');
+  }, [navigation]);
 
   const handleBookmarkPress = useCallback(() => {
     setHistoryOverlayVisible(true);

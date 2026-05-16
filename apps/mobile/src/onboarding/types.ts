@@ -17,5 +17,6 @@ export interface OnboardingResults {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  activity_multiplier: number;
   safety_gate: SafetyGateResult;
 }

@@ -3,6 +3,7 @@ export type RootStackParamList = {
   Login: { message?: string } | undefined;
   Home: undefined;
   Water: { date: string };
+  Settings: undefined;
   Onboarding: { onOnboardingComplete?: () => void } | undefined;
 };
 

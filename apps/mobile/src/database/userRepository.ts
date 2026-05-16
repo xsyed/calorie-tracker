@@ -1,6 +1,22 @@
 import { initDatabase } from './database';
 import type { User } from './types';
 
+export type UserSettingsUpdate = Pick<
+  User,
+  | 'gender'
+  | 'height_cm'
+  | 'current_weight_kg'
+  | 'age'
+  | 'goal'
+  | 'target_weight_kg'
+  | 'timeframe_days'
+  | 'daily_target_calories'
+  | 'protein_g'
+  | 'carbs_g'
+  | 'fat_g'
+  | 'activity_multiplier'
+>;
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 }
@@ -25,6 +41,8 @@ function mapRowToUser(row: Record<string, unknown>): User {
     protein_g: row.protein_g == null ? null : (row.protein_g as number),
     carbs_g: row.carbs_g == null ? null : (row.carbs_g as number),
     fat_g: row.fat_g == null ? null : (row.fat_g as number),
+    activity_multiplier:
+      row.activity_multiplier == null ? 1.2 : (row.activity_multiplier as number),
   };
 }
 
@@ -42,8 +60,9 @@ export async function insertUser(data: Omit<User, 'id'>): Promise<User> {
   const id = generateId();
   await db.execute(
     `INSERT INTO User (id, firebase_uid, gender, height_cm, current_weight_kg, age, goal,
-       target_weight_kg, timeframe_days, daily_target_calories, protein_g, carbs_g, fat_g)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       target_weight_kg, timeframe_days, daily_target_calories, protein_g, carbs_g, fat_g,
+       activity_multiplier)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       data.firebase_uid,
@@ -58,6 +77,7 @@ export async function insertUser(data: Omit<User, 'id'>): Promise<User> {
       data.protein_g,
       data.carbs_g,
       data.fat_g,
+      data.activity_multiplier,
     ],
   );
   return { id, ...data };
@@ -71,4 +91,42 @@ export async function getUser(firebaseUid: string): Promise<User | null> {
   );
   if (result.rows.length === 0) return null;
   return mapRowToUser(result.rows[0] as Record<string, unknown>);
+}
+
+export async function updateUserSettings(
+  firebaseUid: string,
+  data: UserSettingsUpdate,
+): Promise<void> {
+  const db = initDatabase();
+  await db.execute(
+    `UPDATE User
+     SET gender = ?,
+         height_cm = ?,
+         current_weight_kg = ?,
+         age = ?,
+         goal = ?,
+         target_weight_kg = ?,
+         timeframe_days = ?,
+         daily_target_calories = ?,
+         protein_g = ?,
+         carbs_g = ?,
+         fat_g = ?,
+         activity_multiplier = ?
+     WHERE firebase_uid = ?`,
+    [
+      data.gender,
+      data.height_cm,
+      data.current_weight_kg,
+      data.age,
+      data.goal,
+      data.target_weight_kg,
+      data.timeframe_days,
+      data.daily_target_calories,
+      data.protein_g,
+      data.carbs_g,
+      data.fat_g,
+      data.activity_multiplier,
+      firebaseUid,
+    ],
+  );
 }

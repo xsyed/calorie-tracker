@@ -20,10 +20,12 @@ export function initDatabase(): DB {
       'daily_target_calories REAL, ' +
       'protein_g REAL, ' +
       'carbs_g REAL, ' +
-      'fat_g REAL' +
+      'fat_g REAL, ' +
+      'activity_multiplier REAL NOT NULL DEFAULT 1.2' +
       ')',
     [],
   );
+  ensureUserActivityMultiplierColumn(db);
   db.executeSync(
     'CREATE TABLE IF NOT EXISTS food_entries (' +
       'id TEXT PRIMARY KEY, ' +
@@ -121,4 +123,18 @@ export function initDatabase(): DB {
     [],
   );
   return db;
+}
+
+function ensureUserActivityMultiplierColumn(database: DB): void {
+  const result = database.executeSync('PRAGMA table_info(User)', []);
+  const hasActivityMultiplier = result.rows.some(
+    (row) => row.name === 'activity_multiplier',
+  );
+
+  if (!hasActivityMultiplier) {
+    database.executeSync(
+      'ALTER TABLE User ADD COLUMN activity_multiplier REAL NOT NULL DEFAULT 1.2',
+      [],
+    );
+  }
 }

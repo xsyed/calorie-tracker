@@ -12,6 +12,7 @@ export interface User {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
+  activity_multiplier: number;
 }
 
 export interface OnboardingFormData {

@@ -14,12 +14,7 @@ import {
 } from '@react-native-google-signin/google-signin';
 import { useRoute } from '@react-navigation/native';
 
-import { signInWithGoogle, signInWithApple, useAuth } from '../auth';
-import {
-  AuthConfigurationError,
-  AppleAuthConfigurationError,
-  PlayServicesUnavailableError,
-} from '../auth/types';
+import { mapAuthErrorMessage, signInWithGoogle, signInWithApple, useAuth } from '../auth';
 
 export default function LoginScreen() {
   const auth = useAuth();
@@ -55,7 +50,7 @@ export default function LoginScreen() {
           return;
         }
       } catch (err) {
-        setErrorMessage(mapError(err));
+        setErrorMessage(mapAuthErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -144,48 +139,6 @@ export default function LoginScreen() {
       </View>
     </View>
   );
-}
-
-function mapError(err: unknown): string {
-  if (
-    err instanceof AuthConfigurationError ||
-    err instanceof AppleAuthConfigurationError
-  ) {
-    return 'Authentication service unavailable';
-  }
-  if (err instanceof PlayServicesUnavailableError) {
-    return 'Google Play Services are not available';
-  }
-  if (err instanceof Error && 'retryAfter' in err) {
-    const retryAfter = (err as Record<string, unknown>).retryAfter;
-    if (typeof retryAfter === 'number') {
-      const minutes = Math.ceil(retryAfter / 60);
-      return `Too many attempts. Try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`;
-    }
-    return 'Too many attempts. Try again later.';
-  }
-  if (err instanceof Error) {
-    if (
-      'code' in err &&
-      typeof (err as Record<string, unknown>).code === 'string'
-    ) {
-      const code = (err as Record<string, unknown>).code as string;
-      if (code === 'auth/network-request-failed') {
-        return 'No internet connection';
-      }
-      if (code === 'auth/too-many-requests') {
-        return 'Too many attempts. Try again later.';
-      }
-      if (code === 'auth/service-unavailable') {
-        return 'Service temporarily unavailable';
-      }
-    }
-    if (err.message.toLowerCase().includes('network')) {
-      return 'No internet connection';
-    }
-    return err.message;
-  }
-  return 'An unexpected error occurred';
 }
 
 const styles = StyleSheet.create({

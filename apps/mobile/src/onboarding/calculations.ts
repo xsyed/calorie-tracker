@@ -120,6 +120,7 @@ export function calculateOnboardingResults(data: OnboardingFormData): Onboarding
     protein_g: macros.proteinG,
     carbs_g: macros.carbsG,
     fat_g: macros.fatG,
+    activity_multiplier: SEDENTARY_MULTIPLIER,
     safety_gate: safetyGate,
   };
 }

@@ -1,5 +1,6 @@
 export { initDatabase } from './database';
-export { userExists, insertUser, getUser } from './userRepository';
+export { userExists, insertUser, getUser, updateUserSettings } from './userRepository';
+export type { UserSettingsUpdate } from './userRepository';
 export {
   insertFoodEntry,
   insertFoodItem,

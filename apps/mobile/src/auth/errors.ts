@@ -1,3 +1,9 @@
+import {
+  AppleAuthConfigurationError,
+  AuthConfigurationError,
+  PlayServicesUnavailableError,
+} from './types';
+
 export function isNativeErrorWithCode(
   err: unknown,
 ): err is { code: string; message: string } {
@@ -34,6 +40,48 @@ export function createRateLimitError(err: {
   const retryAfter = extractRetryAfter(err);
   const error = Object.assign(new Error(message), { retryAfter });
   return error;
+}
+
+export function mapAuthErrorMessage(err: unknown): string {
+  if (
+    err instanceof AuthConfigurationError ||
+    err instanceof AppleAuthConfigurationError
+  ) {
+    return 'Authentication service unavailable';
+  }
+  if (err instanceof PlayServicesUnavailableError) {
+    return 'Google Play Services are not available';
+  }
+  if (err instanceof Error && 'retryAfter' in err) {
+    const retryAfter = (err as Record<string, unknown>).retryAfter;
+    if (typeof retryAfter === 'number') {
+      const minutes = Math.ceil(retryAfter / 60);
+      return `Too many attempts. Try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+    }
+    return 'Too many attempts. Try again later.';
+  }
+  if (err instanceof Error) {
+    if (
+      'code' in err &&
+      typeof (err as Record<string, unknown>).code === 'string'
+    ) {
+      const code = (err as Record<string, unknown>).code as string;
+      if (code === 'auth/network-request-failed') {
+        return 'No internet connection';
+      }
+      if (code === 'auth/too-many-requests') {
+        return 'Too many attempts. Try again later.';
+      }
+      if (code === 'auth/service-unavailable') {
+        return 'Service temporarily unavailable';
+      }
+    }
+    if (err.message.toLowerCase().includes('network')) {
+      return 'No internet connection';
+    }
+    return err.message;
+  }
+  return 'An unexpected error occurred';
 }
 
 function extractRetryAfter(err: {

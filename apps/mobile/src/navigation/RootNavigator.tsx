@@ -8,6 +8,7 @@ import { initDatabase, userExists } from '../database';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import SplashScreen from '../screens/SplashScreen';
 import WaterScreen from '../screens/WaterScreen';
 import WeightScreen from '../screens/WeightScreen';
@@ -148,6 +149,7 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Home" component={AuthenticatedTabs} />
             <Stack.Screen name="Water" component={WaterScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
         ) : (
           <Stack.Screen

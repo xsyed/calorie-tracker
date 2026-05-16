@@ -75,6 +75,7 @@ export default function OnboardingScreen() {
         protein_g: calculationResults.protein_g,
         carbs_g: calculationResults.carbs_g,
         fat_g: calculationResults.fat_g,
+        activity_multiplier: calculationResults.activity_multiplier,
       });
       params.onOnboardingComplete?.();
     } catch {
