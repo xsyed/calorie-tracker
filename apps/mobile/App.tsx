@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from './src/auth';
+import { rootNavigationRef } from './src/navigation/rootNavigation';
 import RootNavigator from './src/navigation/RootNavigator';
 import { DRIVE_APPDATA_SCOPE } from './src/services';
 
@@ -26,7 +27,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <AuthProvider>
-        <NavigationContainer>
+        <NavigationContainer ref={rootNavigationRef}>
           <RootNavigator />
         </NavigationContainer>
       </AuthProvider>

@@ -11,8 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { CompositeNavigationProp } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { CompositeNavigationProp, RouteProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -51,6 +51,8 @@ type HomeNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<RootTabParamList, 'Home'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
+
+type HomeRoute = RouteProp<RootTabParamList, 'Home'>;
 
 function getTodayDate(): string {
   const now = new Date();
@@ -120,6 +122,7 @@ function mapErrorToUserMessage(code: ParseErrorCode): string {
 export default function HomeScreen() {
   const auth = useAuth();
   const navigation = useNavigation<HomeNavigation>();
+  const route = useRoute<HomeRoute>();
   const isDarkMode = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const [isSubmitting, setSubmitting] = useState(false);
@@ -129,6 +132,7 @@ export default function HomeScreen() {
   const [userReadyVersion, setUserReadyVersion] = useState(0);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputBarRef = useRef<InputBarHandle>(null);
+  const handledFocusRequestIdRef = useRef<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const selectedDateRef = useRef(selectedDate);
@@ -279,6 +283,18 @@ export default function HomeScreen() {
       if (uid === null) return;
       loadDataForDate(selectedDateRef.current);
     }, [loadDataForDate])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const requestId = route.params?.focusLogInputRequestId;
+      if (requestId === undefined || handledFocusRequestIdRef.current === requestId) return;
+
+      handledFocusRequestIdRef.current = requestId;
+      requestAnimationFrame(() => {
+        inputBarRef.current?.focus();
+      });
+    }, [route.params?.focusLogInputRequestId]),
   );
 
   const handleSubmit = useCallback(

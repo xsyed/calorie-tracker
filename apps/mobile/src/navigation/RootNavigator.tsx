@@ -14,6 +14,7 @@ import WaterScreen from '../screens/WaterScreen';
 import WeightScreen from '../screens/WeightScreen';
 import {
   detectRestoreBackups,
+  MealReminderNotificationTapRouter,
   PeriodicBackupTriggers,
   type RestoreBackupCandidate,
 } from '../services';
@@ -203,6 +204,9 @@ export default function RootNavigator() {
           />
         )}
       </Stack.Navigator>
+      <MealReminderNotificationTapRouter
+        enabled={auth.status === 'authenticated' && userCheckState === 'exists'}
+      />
       {userCheckState === 'exists' && (
         <>
           <FlushTriggers />

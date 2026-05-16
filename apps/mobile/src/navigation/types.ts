@@ -1,9 +1,15 @@
-import type { RestoreBackupCandidate } from '../services';
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+import type { RestoreBackupCandidate } from '../services/restoreService';
+
+interface HomeRouteParams {
+  focusLogInputRequestId?: string;
+}
 
 export type RootStackParamList = {
   Splash: undefined;
   Login: { message?: string } | undefined;
-  Home: undefined;
+  Home: NavigatorScreenParams<RootTabParamList> | undefined;
   Water: { date: string };
   Settings: undefined;
   Onboarding: {
@@ -16,6 +22,6 @@ export type RootStackParamList = {
 };
 
 export type RootTabParamList = {
-  Home: undefined;
+  Home: HomeRouteParams | undefined;
   Weight: undefined;
 };

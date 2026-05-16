@@ -14,8 +14,12 @@ import { mapAuthErrorMessage, useAuth } from '../auth';
 import {
   getBackupMetadata,
   getBackupPreferences,
+  getMealReminderPreferences,
+  getMealReminders,
   getUser,
+  saveMealReminder,
   setBackupPreferences,
+  setMealReminderPreferences,
   updateUserSettings,
 } from '../database';
 import type { BackupMetadata, BackupPreferences } from '../database';
@@ -23,12 +27,26 @@ import type { RootStackParamList } from '../navigation/types';
 import {
   runManualBackup,
   syncPeriodicBackupSchedule,
+  cancelScheduledMealReminders,
+  getNotificationPermissionStatus,
+  openMealReminderChannelSettings,
+  openNotificationSettings,
+  requestNotificationPermission,
+  rescheduleMealReminders,
+  MealReminderSchedulingError,
   type ManualBackupProgress,
   type ManualBackupResult,
+  type NotificationPermissionStatus,
 } from '../services';
 import SettingsBackupSection, { formatBytes } from './SettingsBackupSection';
 import SettingsForm from './SettingsForm';
 import type { SettingsTextFieldKey } from './SettingsForm';
+import SettingsRemindersSection, {
+  isReminderSettingsDirty,
+  mapRemindersToForm,
+  validateReminderSettings,
+  type MealReminderSettingsForm,
+} from './SettingsRemindersSection';
 import {
   getAllSettingsValidationFields,
   isSettingsDirty,
@@ -63,6 +81,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [backupMetadata, setBackupMetadata] = useState<BackupMetadata | null>(null);
   const [backupPreferences, setBackupPreferencesState] =
     useState<BackupPreferences | null>(null);
+  const [loadedReminderSettings, setLoadedReminderSettings] =
+    useState<MealReminderSettingsForm | null>(null);
+  const [formReminderSettings, setFormReminderSettings] =
+    useState<MealReminderSettingsForm | null>(null);
+  const [notificationPermissionStatus, setNotificationPermissionStatus] =
+    useState<NotificationPermissionStatus | null>(null);
   const [backupProgress, setBackupProgress] =
     useState<ManualBackupProgress | null>(null);
   const [backupStatusMessage, setBackupStatusMessage] = useState<string | null>(null);
@@ -72,7 +96,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   >({});
   const allowNavigationRef = useRef(false);
 
-  const isDirty = useMemo(
+  const settingsDirty = useMemo(
     () =>
       loadedSettings !== null &&
       formSettings !== null &&
@@ -80,9 +104,21 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     [loadedSettings, formSettings],
   );
 
+  const remindersDirty = useMemo(
+    () => isReminderSettingsDirty(loadedReminderSettings, formReminderSettings),
+    [formReminderSettings, loadedReminderSettings],
+  );
+
+  const isDirty = settingsDirty || remindersDirty;
+
   const validationErrors = useMemo(
     () => (formSettings === null ? {} : validateSettingsForm(formSettings)),
     [formSettings],
+  );
+
+  const reminderValidationErrors = useMemo(
+    () => validateReminderSettings(formReminderSettings),
+    [formReminderSettings],
   );
 
   const visibleValidationErrors = useMemo(
@@ -96,6 +132,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       setFormSettings(null);
       setBackupMetadata(null);
       setBackupPreferencesState(null);
+      setLoadedReminderSettings(null);
+      setFormReminderSettings(null);
+      setNotificationPermissionStatus(null);
       setSaveError(null);
       setLoadState('missing');
       return;
@@ -103,23 +142,43 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     setLoadState('loading');
     try {
-      const [user, metadata, preferences] = await Promise.all([
+      const [
+        user,
+        metadata,
+        preferences,
+        reminderPreferences,
+        reminders,
+        permissionStatus,
+      ] = await Promise.all([
         getUser(auth.user.uid),
         getBackupMetadata(),
         getBackupPreferences(),
+        getMealReminderPreferences(auth.user.uid),
+        getMealReminders(auth.user.uid),
+        getNotificationPermissionStatus(),
       ]);
       if (user === null) {
         setLoadedSettings(null);
         setFormSettings(null);
         setBackupMetadata(null);
         setBackupPreferencesState(null);
+        setLoadedReminderSettings(null);
+        setFormReminderSettings(null);
+        setNotificationPermissionStatus(permissionStatus);
         setSaveError(null);
         setLoadState('missing');
         return;
       }
       const nextSettings = mapUserToSettingsForm(user);
+      const nextReminderSettings = mapRemindersToForm(
+        reminderPreferences.reminders_enabled,
+        reminders,
+      );
       setLoadedSettings(nextSettings);
       setFormSettings(nextSettings);
+      setLoadedReminderSettings(nextReminderSettings);
+      setFormReminderSettings(nextReminderSettings);
+      setNotificationPermissionStatus(permissionStatus);
       setHasManualMacroEdits(false);
       setTouchedValidationFields({});
       setBackupMetadata(metadata);
@@ -134,6 +193,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       setFormSettings(null);
       setBackupMetadata(null);
       setBackupPreferencesState(null);
+      setLoadedReminderSettings(null);
+      setFormReminderSettings(null);
+      setNotificationPermissionStatus(null);
       setSaveError(null);
       setLoadState('error');
     }
@@ -218,7 +280,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   }, [applyTargetRecalculation, hasManualMacroEdits]);
 
   const saveSettings = useCallback(async () => {
-    if (!auth.user || formSettings === null) return;
+    if (!auth.user || formSettings === null || formReminderSettings === null) return;
 
     const errors = validateSettingsForm(formSettings);
     if (Object.keys(errors).length > 0) {
@@ -232,19 +294,57 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       );
       return;
     }
+    if (Object.keys(reminderValidationErrors).length > 0) {
+      setSaveError('Fix reminder settings before saving.');
+      return;
+    }
+    if (
+      remindersDirty &&
+      formReminderSettings.reminders_enabled &&
+      notificationPermissionStatus?.canScheduleMealReminders !== true
+    ) {
+      setSaveError('Enable notifications before saving meal reminders.');
+      return;
+    }
+
+    const userId = auth.user.uid;
 
     setIsSaving(true);
     setSaveError(null);
     try {
-      await updateUserSettings(auth.user.uid, mapSettingsFormToUserUpdate(formSettings));
+      await updateUserSettings(userId, mapSettingsFormToUserUpdate(formSettings));
+      if (remindersDirty) {
+        await setMealReminderPreferences({
+          user_id: userId,
+          reminders_enabled: formReminderSettings.reminders_enabled,
+        });
+        await Promise.all(
+          formReminderSettings.reminders.map((reminder) =>
+            saveMealReminder(userId, reminder),
+          ),
+        );
+        if (formReminderSettings.reminders_enabled) {
+          await rescheduleMealReminders(userId);
+        } else {
+          await cancelScheduledMealReminders();
+        }
+      }
       setLoadedSettings(formSettings);
+      setLoadedReminderSettings(formReminderSettings);
       setTouchedValidationFields({});
-    } catch {
-      setSaveError('Failed to save settings. Try again.');
+    } catch (error) {
+      setSaveError(mapSettingsSaveError(error));
     } finally {
       setIsSaving(false);
     }
-  }, [auth.user, formSettings]);
+  }, [
+    auth.user,
+    formReminderSettings,
+    formSettings,
+    notificationPermissionStatus,
+    reminderValidationErrors,
+    remindersDirty,
+  ]);
 
   const signOut = useCallback(async () => {
     setIsSigningOut(true);
@@ -327,6 +427,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     [loadSettings],
   );
 
+  const requestReminderPermission = useCallback(async () => {
+    setSaveError(null);
+    setNotificationPermissionStatus(await requestNotificationPermission());
+  }, []);
+
+  const openReminderNotificationSettings = useCallback(() => {
+    void openNotificationSettings();
+  }, []);
+
+  const openReminderChannelSettings = useCallback(() => {
+    void openMealReminderChannelSettings();
+  }, []);
+
   const saveDisabled = !isDirty || formSettings === null || isSaving || isSigningOut;
 
   return (
@@ -399,6 +512,22 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               preferences={backupPreferences}
               progress={backupProgress}
               statusMessage={backupStatusMessage}
+            />
+          )}
+          remindersSection={(
+            <SettingsRemindersSection
+              errors={reminderValidationErrors}
+              form={formReminderSettings}
+              isDarkMode={isDarkMode}
+              onOpenChannelSettings={openReminderChannelSettings}
+              onOpenNotificationSettings={openReminderNotificationSettings}
+              onRequestPermission={requestReminderPermission}
+              onUpdateForm={(nextReminderSettings) => {
+                setSaveError(null);
+                setSignOutError(null);
+                setFormReminderSettings(nextReminderSettings);
+              }}
+              permissionStatus={notificationPermissionStatus}
             />
           )}
           errors={visibleValidationErrors}
@@ -491,4 +620,12 @@ function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: '
     case 'backup_failed':
       return 'Backup storage is inaccessible. Try again.';
   }
+}
+
+function mapSettingsSaveError(error: unknown): string {
+  if (error instanceof MealReminderSchedulingError) {
+    return 'Too many pending notifications. Disable some reminder days and try again.';
+  }
+
+  return 'Failed to save settings. Try again.';
 }

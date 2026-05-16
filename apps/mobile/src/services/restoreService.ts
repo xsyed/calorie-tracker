@@ -17,6 +17,7 @@ import {
   listGoogleDriveBackups,
 } from './googleDriveBackupClient';
 import type { DriveBackupFile } from './googleDriveBackupClient';
+import { recoverMealReminderScheduleForUser } from './reminderRecoveryService';
 
 export type RestoreErrorCode =
   | 'checksum_unavailable'
@@ -254,6 +255,7 @@ export async function restoreBackupForUser(
         }
       },
     });
+    await recoverMealReminderScheduleForUser(firebaseUid, 'database-restore');
     return { status: 'success', candidate };
   } catch (err) {
     return mapRestoreError(err, candidate, candidates);

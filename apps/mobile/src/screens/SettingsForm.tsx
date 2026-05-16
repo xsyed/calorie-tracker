@@ -20,6 +20,7 @@ export type SettingsTextFieldKey = Exclude<
 interface SettingsFormProps {
   authIdentity: string;
   backupSection: React.ReactNode;
+  remindersSection: React.ReactNode;
   errors: SettingsValidationErrors;
   form: SettingsFormState;
   isDarkMode: boolean;
@@ -36,6 +37,7 @@ interface SettingsFormProps {
 export default function SettingsForm({
   authIdentity,
   backupSection,
+  remindersSection,
   errors,
   form,
   isDarkMode,
@@ -160,13 +162,7 @@ export default function SettingsForm({
         </Pressable>
       </SettingsSection>
 
-      <SettingsSection title="Reminders" isDarkMode={isDarkMode}>
-        <ReadOnlyRow
-          label="Status"
-          value="Reminder setup is handled in the reminders feature."
-          isDarkMode={isDarkMode}
-        />
-      </SettingsSection>
+      {remindersSection}
 
       {backupSection}
 

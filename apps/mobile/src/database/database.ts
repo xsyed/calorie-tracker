@@ -72,6 +72,32 @@ export function initDatabase(): DB {
     [],
   );
   db.executeSync(
+    'CREATE TABLE IF NOT EXISTS meal_reminder_settings (' +
+      'user_id TEXT PRIMARY KEY, ' +
+      'reminders_enabled INTEGER NOT NULL DEFAULT 1, ' +
+      'FOREIGN KEY (user_id) REFERENCES User(id)' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE TABLE IF NOT EXISTS meal_reminders (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'reminder_type TEXT NOT NULL, ' +
+      'local_time TEXT NOT NULL, ' +
+      'enabled INTEGER NOT NULL DEFAULT 1, ' +
+      'enabled_days TEXT NOT NULL, ' +
+      'FOREIGN KEY (user_id) REFERENCES User(id), ' +
+      'UNIQUE (user_id, reminder_type)' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE INDEX IF NOT EXISTS idx_meal_reminders_user ' +
+      'ON meal_reminders(user_id)',
+    [],
+  );
+  db.executeSync(
     'CREATE TABLE IF NOT EXISTS backup_metadata (' +
       'id TEXT PRIMARY KEY CHECK (id = \'current\'), ' +
       'last_backup_at TEXT, ' +

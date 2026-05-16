@@ -78,6 +78,31 @@ export interface BackupPreferences {
   max_backup_count: number;
 }
 
+export type MealReminderType = 'breakfast' | 'lunch' | 'dinner';
+
+export type ReminderWeekday =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface MealReminder {
+  id: string | null;
+  user_id: string;
+  reminder_type: MealReminderType;
+  local_time: string;
+  enabled: boolean;
+  enabled_days: ReminderWeekday[];
+}
+
+export interface MealReminderPreferences {
+  user_id: string;
+  reminders_enabled: boolean;
+}
+
 export interface WaterEntry {
   id: string;
   user_id: string;

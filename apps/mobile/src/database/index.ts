@@ -52,6 +52,16 @@ export {
   getWeightEntries,
   insertWeightEntry,
 } from './weightRepository';
+export {
+  deleteMealReminder,
+  disableMealReminder,
+  getMealReminderPreferences,
+  getMealReminders,
+  getUsersWithEnabledMealReminderPreferences,
+  saveMealReminder,
+  setMealReminderPreferences,
+} from './mealReminderRepository';
+export type { MealReminderWrite } from './mealReminderRepository';
 export type {
   User,
   OnboardingFormData,
@@ -62,6 +72,10 @@ export type {
   AppSetting,
   BackupMetadata,
   BackupPreferences,
+  MealReminder,
+  MealReminderPreferences,
+  MealReminderType,
+  ReminderWeekday,
   WaterEntry,
   WaterDailyTotal,
   WeightEntry,

@@ -69,3 +69,38 @@ export type {
   ParseErrorCode,
 } from './llmService';
 export { flushQueue } from './queueFlusher';
+export {
+  cancelScheduledMealReminders,
+  MealReminderSchedulingError,
+  rescheduleMealReminders,
+} from './mealReminderSchedulingService';
+export {
+  recoverEnabledMealReminderSchedules,
+  recoverMealReminderScheduleForUser,
+  runMealReminderRecoveryHeadlessTask,
+} from './reminderRecoveryService';
+export type {
+  MealReminderRecoveryResult,
+  MealReminderRecoverySource,
+  MealReminderRecoveryStatus,
+} from './reminderRecoveryService';
+export type {
+  MealReminderSchedulingErrorCode,
+  MealReminderScheduleResult,
+} from './mealReminderSchedulingService';
+export {
+  ensureMealReminderNotificationChannel,
+  getNotificationPermissionStatus,
+  MEAL_REMINDERS_CHANNEL_ID,
+  openMealReminderChannelSettings,
+  openNotificationSettings,
+  requestNotificationPermission,
+} from './notificationService';
+export {
+  MealReminderNotificationTapRouter,
+  registerNotificationBackgroundTapHandler,
+} from './notificationTapRouting';
+export type {
+  NotificationPermissionState,
+  NotificationPermissionStatus,
+} from './notificationService';

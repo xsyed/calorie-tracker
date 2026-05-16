@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 export interface InputBarHandle {
+  focus: () => void;
   setText: (text: string) => void;
 }
 
@@ -27,11 +28,15 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
   onBookmarkPress,
 }, ref) {
   const [text, setRawText] = useState('');
+  const inputRef = useRef<TextInput>(null);
   const isDarkMode = useColorScheme() === 'dark';
 
   useImperativeHandle(
     ref,
     () => ({
+      focus: () => {
+        inputRef.current?.focus();
+      },
       setText: (newText: string) => {
         setRawText(newText);
       },
@@ -85,6 +90,7 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
         </Pressable>
       )}
       <TextInput
+        ref={inputRef}
         style={[styles.input, isDarkMode && styles.inputDark]}
         placeholder="What did you eat or do?"
         placeholderTextColor={isDarkMode ? '#888888' : '#999999'}

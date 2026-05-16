@@ -6,7 +6,7 @@ Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
 
 **apps/mobile** — React Native 0.85.3 bare workflow, TypeScript strict.
 - **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
-- **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Tables include `User`, food/exercise logs, app settings, water entries, weight entries, saved meals.
+- **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Tables include `User`, food/exercise logs, app settings, water entries, weight entries, saved meals, meal reminders, reminder settings.
 - **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding → Home → Weight → Water.
 - **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`. No UI library.
 
