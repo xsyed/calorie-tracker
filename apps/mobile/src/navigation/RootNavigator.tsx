@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
@@ -19,65 +17,9 @@ import {
   type RestoreBackupCandidate,
 } from '../services';
 import { FlushTriggers } from '../services/FlushTriggers';
-import type { RootStackParamList, RootTabParamList } from './types';
+import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<RootTabParamList>();
-
-function AuthenticatedTabs() {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ color, focused }) => (
-          <TabIcon color={color} focused={focused} routeName={route.name} />
-        ),
-      })}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ tabBarLabel: 'Home' }}
-      />
-      <Tab.Screen
-        name="Weight"
-        component={WeightScreen}
-        options={{ tabBarLabel: 'Weight' }}
-      />
-    </Tab.Navigator>
-  );
-}
-
-interface TabIconProps {
-  color: string;
-  focused: boolean;
-  routeName: keyof RootTabParamList;
-}
-
-function TabIcon({ color, focused, routeName }: TabIconProps) {
-  return (
-    <View
-      style={[
-        styles.tabIcon,
-        focused && styles.tabIconFocused,
-        { borderColor: color },
-      ]}
-    >
-      {routeName === 'Home' ? (
-        <>
-          <View style={[styles.homeRoof, { borderBottomColor: color }]} />
-          <View style={[styles.homeBase, { borderColor: color }]} />
-        </>
-      ) : (
-        <>
-          <View style={[styles.weightDial, { borderColor: color }]} />
-          <View style={[styles.weightNeedle, { backgroundColor: color }]} />
-          <View style={[styles.weightBase, { borderColor: color }]} />
-        </>
-      )}
-    </View>
-  );
-}
 
 export default function RootNavigator() {
   const auth = useAuth();
@@ -192,7 +134,8 @@ export default function RootNavigator() {
           />
         ) : userCheckState === 'exists' ? (
           <>
-            <Stack.Screen name="Home" component={AuthenticatedTabs} />
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Weight" component={WeightScreen} />
             <Stack.Screen name="Water" component={WaterScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
@@ -231,56 +174,3 @@ function isNetworkError(err: unknown): boolean {
   }
   return false;
 }
-
-const styles = StyleSheet.create({
-  tabIcon: {
-    width: 28,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabIconFocused: {
-    opacity: 1,
-  },
-  homeRoof: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 9,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  homeBase: {
-    width: 18,
-    height: 12,
-    marginTop: -1,
-    borderWidth: 2,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  weightDial: {
-    position: 'absolute',
-    top: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-  },
-  weightNeedle: {
-    position: 'absolute',
-    top: 8,
-    width: 2,
-    height: 8,
-    borderRadius: 1,
-    transform: [{ rotate: '25deg' }],
-  },
-  weightBase: {
-    width: 22,
-    height: 18,
-    marginTop: 5,
-    borderWidth: 2,
-    borderRadius: 6,
-  },
-});

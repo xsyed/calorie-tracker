@@ -12,21 +12,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import type { CompositeNavigationProp, RouteProp } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
 import DailySummary from '../components/DailySummary';
-import DateStrip from '../components/DateStrip';
 import EditFoodEntryPrompt from '../components/EditFoodEntryPrompt';
 import EntryActionsPrompt from '../components/EntryActionsPrompt';
 import EntryList from '../components/EntryList';
 import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
 import HistorySavedMealsOverlay from '../components/HistorySavedMealsOverlay';
+import HomeDateCalendar from '../components/HomeDateCalendar';
 import InputBar from '../components/InputBar';
 import type { InputBarHandle } from '../components/InputBar';
-import MonthDropdown from '../components/MonthDropdown';
 import SaveMealPrompt from '../components/SaveMealPrompt';
 import WaterQuickAdd, { DEFAULT_WATER_GOAL } from '../components/WaterQuickAdd';
 import {
@@ -48,16 +46,12 @@ import {
   restoreDeletedFoodEntry,
 } from '../database';
 import type { DeletedFoodEntrySnapshot } from '../database';
-import type { RootStackParamList, RootTabParamList } from '../navigation/types';
+import type { RootStackParamList } from '../navigation/types';
 import { editFoodEntryWithPrompt, isQueueFlushing, parseFoodText } from '../services';
 import type { EditFoodEntryProgressStep, ParseErrorCode } from '../services';
 
-type HomeNavigation = CompositeNavigationProp<
-  BottomTabNavigationProp<RootTabParamList, 'Home'>,
-  NativeStackNavigationProp<RootStackParamList>
->;
-
-type HomeRoute = RouteProp<RootTabParamList, 'Home'>;
+type HomeNavigation = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type HomeRoute = RouteProp<RootStackParamList, 'Home'>;
 
 const DELETE_UNDO_MS = 6000;
 
@@ -81,21 +75,6 @@ function formatYYYYMMDD(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-function getDateStripRange(date: string): { startDate: string; endDate: string } {
-  const end = new Date(date + 'T00:00:00');
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (end > today) {
-    end.setTime(today.getTime());
-  }
-  const start = new Date(end);
-  start.setDate(start.getDate() - 6);
-  return {
-    startDate: formatYYYYMMDD(start),
-    endDate: formatYYYYMMDD(end),
-  };
 }
 
 function getMonthRange(date: string): { startDate: string; endDate: string } {
@@ -376,13 +355,9 @@ export default function HomeScreen() {
         totalFat: totals.total_fat,
       });
 
-      const stripRange = getDateStripRange(date);
       const monthRange = getMonthRange(date);
-      const [stripDates, monthDates] = await Promise.all([
-        getLoggedDatesInRange(uid, stripRange.startDate, stripRange.endDate),
-        getLoggedDatesInRange(uid, monthRange.startDate, monthRange.endDate),
-      ]);
-      setLoggedDates(new Set([...stripDates, ...monthDates]));
+      const monthDates = await getLoggedDatesInRange(uid, monthRange.startDate, monthRange.endDate);
+      setLoggedDates(new Set(monthDates));
     } catch {
       setDataError('Something went wrong. Please try again.');
     } finally {
@@ -539,17 +514,22 @@ export default function HomeScreen() {
     setSelectedDate(date);
   }, []);
 
-  const handleVisibleRangeChange = useCallback(async (startDate: string, endDate: string) => {
+  const handleVisibleMonthChange = useCallback(async (date: string) => {
     const uid = userIdRef.current;
     if (uid === null) return;
 
     try {
-      const dates = await getLoggedDatesInRange(uid, startDate, endDate);
+      const monthRange = getMonthRange(date);
+      const dates = await getLoggedDatesInRange(uid, monthRange.startDate, monthRange.endDate);
       setLoggedDates((prev) => new Set([...prev, ...dates]));
     } catch {
       // Month dots are secondary; the main date data loader owns visible errors.
     }
   }, []);
+
+  const handleWeightPress = useCallback(() => {
+    navigation.navigate('Weight');
+  }, [navigation]);
 
   const handleSettingsPress = useCallback(() => {
     navigation.navigate('Settings');
@@ -830,23 +810,40 @@ export default function HomeScreen() {
       <View style={[styles.content, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <MonthDropdown
+            <HomeDateCalendar
               selectedDate={selectedDate}
               loggedDates={loggedDates}
               onDateSelect={onDateSelect}
-              onVisibleRangeChange={handleVisibleRangeChange}
+              onVisibleMonthChange={handleVisibleMonthChange}
             />
-            <Pressable onPress={handleSettingsPress} hitSlop={8}>
-              <View style={[styles.gearIcon, isDarkMode && styles.gearIconDark]}>
-                <Text style={[styles.gearIconText, isDarkMode && styles.gearIconTextDark]}>⚙</Text>
-              </View>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                accessibilityLabel="Open weight"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleWeightPress}
+                style={[styles.headerIconButton, isDarkMode && styles.headerIconButtonDark]}
+              >
+                <View style={[styles.weightGlyphBase, isDarkMode && styles.glyphStrokeDark]}>
+                  <View style={[styles.weightGlyphDial, isDarkMode && styles.glyphStrokeDark]} />
+                  <View style={[styles.weightGlyphNeedle, isDarkMode && styles.glyphFillDark]} />
+                </View>
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleSettingsPress}
+                style={[styles.headerIconButton, isDarkMode && styles.headerIconButtonDark]}
+              >
+                <View style={styles.settingsGlyph}>
+                  <View style={[styles.settingsGlyphLine, isDarkMode && styles.glyphFillDark]} />
+                  <View style={[styles.settingsGlyphLine, isDarkMode && styles.glyphFillDark]} />
+                  <View style={[styles.settingsGlyphLine, isDarkMode && styles.glyphFillDark]} />
+                </View>
+              </Pressable>
+            </View>
           </View>
-          <DateStrip
-            selectedDate={selectedDate}
-            loggedDates={loggedDates}
-            onDateSelect={onDateSelect}
-          />
         </View>
 
         {dataLoading ? (
@@ -865,34 +862,37 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         ) : (
-          <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer}>
-            <DailySummary
-              totalCalories={dailyTotals.totalCalories}
-              totalProtein={dailyTotals.totalProtein}
-              totalCarbs={dailyTotals.totalCarbs}
-              totalFat={dailyTotals.totalFat}
-              targetCalories={userTargets?.dailyCalories ?? null}
-              targetProtein={userTargets?.proteinG ?? null}
-              targetCarbs={userTargets?.carbsG ?? null}
-              targetFat={userTargets?.fatG ?? null}
-              exerciseCalories={exerciseCalories}
-              dateLabel={dateLabel}
-              hasEntries={hasEntries}
-            />
-            <WaterQuickAdd
-              dailyTotal={dailyWaterTotal}
-              waterGoal={waterGoal}
-              onAddWater={handleAddWater}
-              addingAmountMl={addingWaterAmount}
-              dateLabel={dateLabel}
-              onOpenWater={handleOpenWater}
-            />
-            <EntryList
-              foodEntries={foodEntries}
-              exerciseEntries={exerciseEntries}
-              onOpenEntryActions={handleOpenEntryActions}
-            />
-          </ScrollView>
+          <View style={styles.mainContent}>
+            <View style={styles.fixedSummary}>
+              <DailySummary
+                totalCalories={dailyTotals.totalCalories}
+                totalProtein={dailyTotals.totalProtein}
+                totalCarbs={dailyTotals.totalCarbs}
+                totalFat={dailyTotals.totalFat}
+                targetCalories={userTargets?.dailyCalories ?? null}
+                targetProtein={userTargets?.proteinG ?? null}
+                targetCarbs={userTargets?.carbsG ?? null}
+                targetFat={userTargets?.fatG ?? null}
+                exerciseCalories={exerciseCalories}
+                dateLabel={dateLabel}
+                hasEntries={hasEntries}
+              />
+              <WaterQuickAdd
+                dailyTotal={dailyWaterTotal}
+                waterGoal={waterGoal}
+                onAddWater={handleAddWater}
+                addingAmountMl={addingWaterAmount}
+                onOpenWater={handleOpenWater}
+              />
+            </View>
+            <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer}>
+              <EntryList
+                foodEntries={foodEntries}
+                exerciseEntries={exerciseEntries}
+                onOpenEntryActions={handleOpenEntryActions}
+              />
+            </ScrollView>
+          </View>
         )}
       </View>
 
@@ -1000,11 +1000,18 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
   },
-  gearIcon: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 8,
+    zIndex: 50,
+    elevation: 50,
+  },
+  headerIconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -1012,15 +1019,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F0F0F0',
   },
-  gearIconDark: {
+  headerIconButtonDark: {
     backgroundColor: '#2C2C2E',
   },
-  gearIconText: {
-    fontSize: 20,
-    color: '#000000',
+  glyphFillDark: {
+    backgroundColor: '#FFFFFF',
   },
-  gearIconTextDark: {
-    color: '#FFFFFF',
+  glyphStrokeDark: {
+    borderColor: '#FFFFFF',
+  },
+  settingsGlyph: {
+    width: 18,
+    height: 18,
+    justifyContent: 'space-evenly',
+  },
+  settingsGlyphLine: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#000000',
+  },
+  weightGlyphBase: {
+    width: 21,
+    height: 18,
+    marginTop: 4,
+    borderWidth: 2,
+    borderRadius: 6,
+    borderColor: '#000000',
+    alignItems: 'center',
+  },
+  weightGlyphDial: {
+    position: 'absolute',
+    top: -7,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#000000',
+    backgroundColor: 'transparent',
+  },
+  weightGlyphNeedle: {
+    position: 'absolute',
+    top: -1,
+    width: 2,
+    height: 8,
+    borderRadius: 1,
+    backgroundColor: '#000000',
+    transform: [{ rotate: '25deg' }],
   },
   loader: {
     flex: 1,
@@ -1053,12 +1097,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  mainContent: {
+    flex: 1,
+  },
+  fixedSummary: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 8,
+  },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 32,
   },
   errorBanner: {

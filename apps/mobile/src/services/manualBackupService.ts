@@ -26,6 +26,7 @@ import type {
 export type ManualBackupErrorCode =
   | 'no_internet'
   | 'reauth_required'
+  | 'drive_permission_required'
   | 'quota_exceeded'
   | 'interrupted_upload'
   | 'unsupported_platform'
@@ -146,6 +147,13 @@ function mapManualBackupError(err: unknown): ManualBackupFailure {
         status: 'error',
         code: 'reauth_required',
         message: 'Google Drive access required. Please sign in again.',
+      };
+    }
+    if (err.code === 'permission_denied') {
+      return {
+        status: 'error',
+        code: 'drive_permission_required',
+        message: 'Google Drive permission is missing or misconfigured.',
       };
     }
     if (err.code === 'quota_exceeded') {

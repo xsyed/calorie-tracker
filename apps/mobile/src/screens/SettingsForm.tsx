@@ -56,8 +56,27 @@ export default function SettingsForm({
       contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 24 }]}
     >
       <SettingsSection
-        title="Profile"
-        helperText="Profile edits do not change daily or macro targets until Recalculate is used."
+        title="Account"
+        isDarkMode={isDarkMode}
+      >
+        <ReadOnlyRow label="Signed in as" value={authIdentity} isDarkMode={isDarkMode} />
+        <Pressable
+          style={[styles.signOutButton, isSigningOut && styles.buttonDisabled]}
+          onPress={onSignOut}
+          disabled={isSigningOut}
+        >
+          <Text style={styles.signOutButtonText}>
+            {isSigningOut ? 'Signing out...' : 'Sign Out'}
+          </Text>
+        </Pressable>
+        {signOutError !== null && (
+          <Text style={styles.errorText}>{signOutError}</Text>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Body Profile"
+        helperText="Profile edits do not change goals or macro targets until Recalculate is used."
         isDarkMode={isDarkMode}
       >
         <SegmentedField
@@ -87,6 +106,9 @@ export default function SettingsForm({
           isDarkMode={isDarkMode}
           onChangeText={(value) => onUpdateTextField('age', value)}
         />
+      </SettingsSection>
+
+      <SettingsSection title="Goals & Macros" isDarkMode={isDarkMode}>
         <SegmentedField
           label="Goal"
           options={GOAL_OPTIONS}
@@ -108,9 +130,6 @@ export default function SettingsForm({
           isDarkMode={isDarkMode}
           onChangeText={(value) => onUpdateTextField('timeframe_days', value)}
         />
-      </SettingsSection>
-
-      <SettingsSection title="Daily Target" isDarkMode={isDarkMode}>
         <SettingsInput
           label="Calories"
           unit="kcal/day"
@@ -165,31 +184,6 @@ export default function SettingsForm({
       {remindersSection}
 
       {backupSection}
-
-      <SettingsSection title="Account" isDarkMode={isDarkMode}>
-        <ReadOnlyRow label="Signed in as" value={authIdentity} isDarkMode={isDarkMode} />
-        <Pressable
-          style={[styles.signOutButton, isSigningOut && styles.buttonDisabled]}
-          onPress={onSignOut}
-          disabled={isSigningOut}
-        >
-          <Text style={styles.signOutButtonText}>
-            {isSigningOut ? 'Signing out...' : 'Sign Out'}
-          </Text>
-        </Pressable>
-        {signOutError !== null && (
-          <Text style={styles.errorText}>{signOutError}</Text>
-        )}
-        <Pressable
-          style={[styles.deleteButton, styles.buttonDisabled]}
-          disabled
-          accessibilityState={{ disabled: true }}
-        >
-          <Text style={[styles.deleteButtonText, isDarkMode && styles.deleteButtonTextDark]}>
-            Delete Account (coming soon)
-          </Text>
-        </Pressable>
-      </SettingsSection>
     </ScrollView>
   );
 }
@@ -490,23 +484,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  deleteButton: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#D1D1D6',
-    paddingHorizontal: 16,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8E8E93',
-  },
-  deleteButtonTextDark: {
-    color: '#8E8E93',
   },
   buttonDisabled: {
     opacity: 0.5,

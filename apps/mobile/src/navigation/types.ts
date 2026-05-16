@@ -1,5 +1,3 @@
-import type { NavigatorScreenParams } from '@react-navigation/native';
-
 import type { RestoreBackupCandidate } from '../services/restoreService';
 
 interface HomeRouteParams {
@@ -9,7 +7,8 @@ interface HomeRouteParams {
 export type RootStackParamList = {
   Splash: undefined;
   Login: { message?: string } | undefined;
-  Home: NavigatorScreenParams<RootTabParamList> | undefined;
+  Home: HomeRouteParams | undefined;
+  Weight: undefined;
   Water: { date: string };
   Settings: undefined;
   Onboarding: {
@@ -19,9 +18,4 @@ export type RootStackParamList = {
     restoreCandidates?: RestoreBackupCandidate[];
     latestRestoreBackup?: RestoreBackupCandidate;
   } | undefined;
-};
-
-export type RootTabParamList = {
-  Home: HomeRouteParams | undefined;
-  Weight: undefined;
 };

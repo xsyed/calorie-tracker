@@ -8,13 +8,13 @@ import {
 } from 'react-native';
 
 export const DEFAULT_WATER_GOAL = 2000;
+const QUICK_ADD_AMOUNT_ML = 250;
 
 interface WaterQuickAddProps {
   dailyTotal: number;
   waterGoal: number;
   onAddWater: (amountMl: number) => Promise<void>;
   addingAmountMl: number | null;
-  dateLabel: string;
   onOpenWater: () => void;
 }
 
@@ -23,7 +23,6 @@ export default function WaterQuickAdd({
   waterGoal,
   onAddWater,
   addingAmountMl,
-  dateLabel,
   onOpenWater,
 }: WaterQuickAddProps) {
   const isDarkMode = useColorScheme() === 'dark';
@@ -62,12 +61,20 @@ export default function WaterQuickAdd({
         </Pressable>
       </View>
 
-      <Text style={[styles.contextLabel, isDarkMode && styles.contextLabelDark]}>
-        Logging to {dateLabel}
-      </Text>
-      <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]}>
-        {dailyTotal}ml / {effectiveGoal}ml ({percentage}%)
-      </Text>
+      <View style={styles.controlRow}>
+        <Text style={[styles.controlButton, styles.controlButtonDisabled]}>-</Text>
+        <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]} numberOfLines={1}>
+          {dailyTotal}ml/{effectiveGoal}ml ({percentage}%)
+        </Text>
+        <Pressable
+          onPress={() => handleQuickAdd(QUICK_ADD_AMOUNT_ML)}
+          disabled={buttonsDisabled}
+          hitSlop={8}
+          style={buttonsDisabled && styles.controlButtonDisabled}
+        >
+          <Text style={[styles.controlButton, { color: accentColor }]}>+</Text>
+        </Pressable>
+      </View>
 
       <View style={[styles.track, isDarkMode && styles.trackDark]}>
         <View
@@ -78,35 +85,9 @@ export default function WaterQuickAdd({
         />
       </View>
 
-      <View style={styles.buttonRow}>
-        <Pressable
-          onPress={() => handleQuickAdd(200)}
-          disabled={buttonsDisabled}
-          style={[
-            styles.pillButton,
-            { borderColor: accentColor },
-            buttonsDisabled && styles.pillButtonDisabled,
-          ]}
-        >
-          <Text style={[styles.pillButtonText, { color: accentColor }]}>
-            {addingAmountMl === 200 ? 'Adding...' : '+200ml'}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => handleQuickAdd(500)}
-          disabled={buttonsDisabled}
-          style={[
-            styles.pillButton,
-            { borderColor: accentColor },
-            buttonsDisabled && styles.pillButtonDisabled,
-          ]}
-        >
-          <Text style={[styles.pillButtonText, { color: accentColor }]}>
-            {addingAmountMl === 500 ? 'Adding...' : '+500ml'}
-          </Text>
-        </Pressable>
-      </View>
+      <Text style={[styles.incrementLabel, isDarkMode && styles.contextLabelDark]}>
+        {addingAmountMl === QUICK_ADD_AMOUNT_ML ? 'Adding...' : '0.25L each'}
+      </Text>
     </View>
   );
 }
@@ -114,8 +95,9 @@ export default function WaterQuickAdd({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   cardDark: {
     backgroundColor: '#1C1C1E',
@@ -126,7 +108,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
     color: '#000000',
   },
@@ -134,29 +116,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   openLink: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  contextLabel: {
     fontSize: 12,
-    color: '#666666',
-    marginTop: 8,
+    fontWeight: '600',
   },
   contextLabelDark: {
     color: '#999999',
   },
   statsLabel: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
     color: '#000000',
-    marginTop: 12,
-    marginBottom: 4,
+    textAlign: 'center',
   },
   statsLabelDark: {
     color: '#FFFFFF',
   },
   track: {
-    height: 8,
-    borderRadius: 4,
+    height: 2,
+    borderRadius: 1,
     backgroundColor: '#E5E5E5',
     overflow: 'hidden',
   },
@@ -164,25 +142,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A3A3C',
   },
   bar: {
-    height: 8,
-    borderRadius: 4,
+    height: 2,
+    borderRadius: 1,
   },
-  buttonRow: {
+  controlRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
   },
-  pillButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
+  controlButton: {
+    minWidth: 20,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textAlign: 'center',
   },
-  pillButtonDisabled: {
+  controlButtonDisabled: {
     opacity: 0.4,
   },
-  pillButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+  incrementLabel: {
+    fontSize: 10,
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 2,
   },
 });

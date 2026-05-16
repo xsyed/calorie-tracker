@@ -16,6 +16,7 @@ const DRIVE_FILE_FIELDS = 'id,name,createdTime,modifiedTime,size,appProperties';
 export type GoogleDriveBackupErrorCode =
   | 'drive_unavailable'
   | 'reauth_required'
+  | 'permission_denied'
   | 'quota_exceeded'
   | 'network_error'
   | 'api_error'
@@ -85,6 +86,13 @@ export class GoogleDriveQuotaExceededError extends GoogleDriveBackupError {
   }
 }
 
+class GoogleDrivePermissionError extends GoogleDriveBackupError {
+  constructor(message = 'Google Drive appData permission is missing or misconfigured') {
+    super('permission_denied', message);
+    this.name = 'GoogleDrivePermissionError';
+  }
+}
+
 export interface UploadBackupProgress {
   bytesSent: number;
   totalBytes: number;
@@ -125,6 +133,19 @@ function getDriveErrorReason(body: DriveErrorBody): string | null {
   const reasons = body.error?.errors;
   if (!Array.isArray(reasons)) return null;
   return reasons.find((item) => typeof item.reason === 'string')?.reason ?? null;
+}
+
+function hasDriveAppDataScope(scopes: readonly string[] | undefined): boolean {
+  return scopes?.includes(DRIVE_APPDATA_SCOPE) === true;
+}
+
+function isDrivePermissionReason(reason: string | null): boolean {
+  return (
+    reason === 'accessNotConfigured' ||
+    reason === 'forbidden' ||
+    reason === 'insufficientFilePermissions' ||
+    reason === 'insufficientPermissions'
+  );
 }
 
 function parseSize(size: string | undefined): number | null {
@@ -171,6 +192,10 @@ function mapDriveErrorBody(statusCode: number, bodyText: string): GoogleDriveBac
     return new GoogleDriveQuotaExceededError(message);
   }
 
+  if (statusCode === 403 && isDrivePermissionReason(reason)) {
+    return new GoogleDrivePermissionError(message);
+  }
+
   if (statusCode === 401 || statusCode === 403) {
     return new GoogleDriveReauthRequiredError(message);
   }
@@ -188,6 +213,10 @@ async function parseDriveError(response: Response): Promise<GoogleDriveBackupErr
     return new GoogleDriveQuotaExceededError(message);
   }
 
+  if (response.status === 403 && isDrivePermissionReason(reason)) {
+    return new GoogleDrivePermissionError(message);
+  }
+
   if (response.status === 401 || response.status === 403) {
     return new GoogleDriveReauthRequiredError(message);
   }
@@ -201,12 +230,14 @@ async function ensureDriveScope(): Promise<void> {
     throw new GoogleDriveReauthRequiredError('No Google Sign-In session found');
   }
 
-  if (silent.data.scopes.includes(DRIVE_APPDATA_SCOPE)) return;
+  if (hasDriveAppDataScope(silent.data.scopes)) return;
 
   const scoped = await GoogleSignin.addScopes({ scopes: [DRIVE_APPDATA_SCOPE] });
-  if (scoped === null) return;
-  if (scoped.type === 'cancelled') {
+  if (scoped === null || scoped.type === 'cancelled') {
     throw new GoogleDriveReauthRequiredError('Google Drive scope was not granted');
+  }
+  if (!hasDriveAppDataScope(scoped.data.scopes)) {
+    throw new GoogleDrivePermissionError('Google Drive appData scope was not granted');
   }
 }
 
@@ -236,8 +267,10 @@ async function getDriveAccessToken(): Promise<string> {
 async function refreshDriveAccessToken(previousToken: string): Promise<string> {
   try {
     await GoogleSignin.clearCachedAccessToken(previousToken);
+    await ensureDriveScope();
     return (await GoogleSignin.getTokens()).accessToken;
-  } catch {
+  } catch (err) {
+    if (err instanceof GoogleDriveBackupError) throw err;
     throw new GoogleDriveReauthRequiredError();
   }
 }

@@ -610,7 +610,9 @@ function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: '
     case 'no_internet':
       return 'No internet connection. Connect and try again.';
     case 'reauth_required':
-      return 'Google Drive access expired. Sign in with Google again.';
+      return 'Google Drive permission missing. Sign in with Google and allow Drive backup access.';
+    case 'drive_permission_required':
+      return 'Google Drive backup permission or console setup is missing. Check Drive API/OAuth consent, then sign in again.';
     case 'quota_exceeded':
       return 'Backup storage is full. Delete old Drive app data or try later.';
     case 'interrupted_upload':
@@ -618,7 +620,7 @@ function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: '
     case 'unsupported_platform':
       return 'Backup is coming soon on this platform.';
     case 'backup_failed':
-      return 'Backup storage is inaccessible. Try again.';
+      return 'Google Drive backup failed. Check Drive API/OAuth consent setup if this persists.';
   }
 }
 

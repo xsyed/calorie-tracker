@@ -40,8 +40,7 @@ export function MealReminderNotificationTapRouter({
 
     pendingRequestIdRef.current = null;
     rootNavigationRef.navigate('Home', {
-      screen: 'Home',
-      params: { focusLogInputRequestId: requestId },
+      focusLogInputRequestId: requestId,
     });
   }, [enabled]);
 
