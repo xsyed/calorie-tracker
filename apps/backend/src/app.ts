@@ -4,6 +4,7 @@ import { type BackendConfig } from "./config.js";
 import { createFirebaseAdminHealth } from "./firebaseAuth.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFoundHandler } from "./middleware/notFoundHandler.js";
+import { requestLogger } from "./middleware/requestLogger.js";
 import { createApiRouter } from "./routes/api.js";
 import { createHealthRouter } from "./routes/health.js";
 
@@ -13,6 +14,7 @@ export function createApp(config: BackendConfig): express.Express {
   const app = express();
   const firebaseAdminHealth = createFirebaseAdminHealth(config);
 
+  app.use(requestLogger);
   app.use(json({ limit: REQUEST_BODY_LIMIT }));
   app.use(createHealthRouter(firebaseAdminHealth));
   app.use("/api", createApiRouter(config));

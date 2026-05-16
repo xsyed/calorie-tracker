@@ -232,6 +232,10 @@ async function ensureDriveScope(): Promise<void> {
 
   if (hasDriveAppDataScope(silent.data.scopes)) return;
 
+  await requestDriveScope();
+}
+
+async function requestDriveScope(): Promise<void> {
   const scoped = await GoogleSignin.addScopes({ scopes: [DRIVE_APPDATA_SCOPE] });
   if (scoped === null || scoped.type === 'cancelled') {
     throw new GoogleDriveReauthRequiredError('Google Drive scope was not granted');
@@ -275,6 +279,17 @@ async function refreshDriveAccessToken(previousToken: string): Promise<string> {
   }
 }
 
+async function renewDriveScopeAccessToken(previousToken: string): Promise<string> {
+  try {
+    await GoogleSignin.clearCachedAccessToken(previousToken);
+    await requestDriveScope();
+    return (await GoogleSignin.getTokens()).accessToken;
+  } catch (err) {
+    if (err instanceof GoogleDriveBackupError) throw err;
+    throw new GoogleDriveReauthRequiredError();
+  }
+}
+
 async function driveFetch(
   path: string,
   init: RequestInit,
@@ -294,7 +309,9 @@ async function driveFetch(
   const driveError = await parseDriveError(response.clone());
   if (driveError.code === 'quota_exceeded' || !retryOnAuth) throw driveError;
 
-  const refreshedToken = await refreshDriveAccessToken(token);
+  const refreshedToken = driveError.code === 'permission_denied'
+    ? await renewDriveScopeAccessToken(token)
+    : await refreshDriveAccessToken(token);
   return fetch(`${DRIVE_API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -424,8 +441,13 @@ export async function uploadGoogleDriveBackup(
     return await uploadFileContent(createdFile.id, options, token);
   } catch (err) {
     if (!(err instanceof GoogleDriveBackupError)) throw err;
-    if (err.code !== 'reauth_required') throw err;
-    token = await refreshDriveAccessToken(token);
+    if (err.code === 'reauth_required') {
+      token = await refreshDriveAccessToken(token);
+    } else if (err.code === 'permission_denied') {
+      token = await renewDriveScopeAccessToken(token);
+    } else {
+      throw err;
+    }
     return uploadFileContent(createdFile.id, options, token);
   }
 }

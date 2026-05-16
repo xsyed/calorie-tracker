@@ -8,7 +8,7 @@ Monorepo (npm workspaces): `apps/mobile`, `apps/backend`, `packages/` (empty).
 - **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
 - **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Tables include `User`, food/exercise logs, app settings, water entries, weight entries, saved meals, meal reminders, reminder settings.
 - **Navigation:** `@react-navigation/native-stack` only. Auth-aware routing: Splash → Login → Onboarding → Home → Weight → Water → Settings.
-- **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`, with `react-native-calendars` for the Home expandable week/month calendar. No UI library.
+- **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`, with `react-native-calendars` plus custom Home date/month lists for header-controlled date navigation. No UI library.
 
 **apps/backend** — Node.js/Express TypeScript LLM proxy for OpenRouter, deployable on Fly.io.
 - **Config:** Central env loader for OpenRouter, Firebase, rate-limit, model, port, and runtime env.
@@ -16,7 +16,7 @@ Monorepo (npm workspaces): `apps/mobile`, `apps/backend`, `packages/` (empty).
 - **Deploy:** Fly.io `fly.toml`, backend Dockerfile, GitHub Actions deploy workflow, and deployment runbook in `docs/backend-fly-deploy.md`.
 - **Scope:** No database dependency, no business logic, no user data persistence.
 
-No shared packages, no tests. Home supports food/exercise logging, saved meals/history, water quick-add, and expandable week/month date navigation. Weight supports local weigh-in logging, summary/history, chart trends, delete undo, and edge states. Water has daily logging for selected date plus a local 7-day trend and grouped history. Backend proxy deployment is configured for Fly.io; backend observability remains shallow and intentionally keeps OpenRouter checks outside `/health`.
+No shared packages, no tests. Home supports food/exercise logging, saved meals/history, water quick-add, and header-controlled date/month navigation. Weight supports local weigh-in logging, summary/history, chart trends, delete undo, and edge states. Water has daily logging for selected date plus a local 7-day trend and grouped history. Backend proxy deployment is configured for Fly.io; backend observability remains shallow and intentionally keeps OpenRouter checks outside `/health`.
 
 ---
 

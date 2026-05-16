@@ -95,12 +95,15 @@ export default function WaterQuickAdd({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   cardDark: {
     backgroundColor: '#1C1C1E',
+    borderColor: '#2C2C2E',
   },
   header: {
     flexDirection: 'row',

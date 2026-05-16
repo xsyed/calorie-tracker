@@ -1,1 +1,3 @@
 - RN monorepo Android release APK: inspect `apps/mobile/android/app/build.gradle` before giving build command; `react.root` must be mobile app root and `entryFile` actual mobile entry, while `reactNativeDir`/`codegenDir` can still point workspace `node_modules`.
+- Date strip regression: do not replace scrollable date list with fixed 7-item view when user asks "7 days only"; keep full data scrollable and make 7 items visible by item sizing/windowing.
+- Home header spacing: compact date strip still needs vertical clearance from absolute weight/settings actions; check overlap, not only height.

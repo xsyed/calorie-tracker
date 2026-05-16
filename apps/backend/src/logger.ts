@@ -1,8 +1,12 @@
 import { createHash } from "node:crypto";
 
-type LogValue = boolean | number | string | null | undefined;
+export type LogValue = boolean | number | string | null | undefined | LogObject | LogValue[];
 
-type LogContext = Readonly<Record<string, LogValue>>;
+interface LogObject {
+  readonly [key: string]: LogValue;
+}
+
+type LogContext = LogObject;
 
 const SENSITIVE_KEY_PATTERN = /authorization|bearer|token|api[_-]?key|service[_-]?account|private[_-]?key|secret/i;
 const MAX_LOG_VALUE_LENGTH = 240;
@@ -10,6 +14,10 @@ const TOKEN_HASH_LENGTH = 12;
 
 export function logWarn(message: string, context: LogContext = {}): void {
   writeLog("warn", message, context);
+}
+
+export function logInfo(message: string, context: LogContext = {}): void {
+  writeLog("info", message, context);
 }
 
 export function logError(message: string, context: LogContext = {}): void {
@@ -68,6 +76,14 @@ function sanitizeValue(key: string, value: LogValue): LogValue {
 
   if (SENSITIVE_KEY_PATTERN.test(key)) {
     return "[redacted]";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(key, item));
+  }
+
+  if (typeof value === "object") {
+    return sanitizeContext(value);
   }
 
   if (typeof value !== "string" || value.length <= MAX_LOG_VALUE_LENGTH) {
