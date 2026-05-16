@@ -5,3 +5,8 @@ export type RootStackParamList = {
   Water: { date: string };
   Onboarding: { onOnboardingComplete?: () => void } | undefined;
 };
+
+export type RootTabParamList = {
+  Home: undefined;
+  Weight: undefined;
+};

@@ -78,9 +78,10 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
             isSubmitting && styles.buttonDisabled,
           ]}
         >
-          <Text style={[styles.bookmarkText, isDarkMode && styles.bookmarkTextDark]}>
-            🔖
-          </Text>
+          <BookmarkIcon
+            backgroundColor={isDarkMode ? '#2C2C2E' : '#F0F0F0'}
+            color={isDarkMode ? '#FFFFFF' : '#000000'}
+          />
         </Pressable>
       )}
       <TextInput
@@ -125,6 +126,19 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
   );
 });
 
+interface BookmarkIconProps {
+  backgroundColor: string;
+  color: string;
+}
+
+function BookmarkIcon({ backgroundColor, color }: BookmarkIconProps) {
+  return (
+    <View style={[styles.bookmarkIcon, { backgroundColor: color }]}>
+      <View style={[styles.bookmarkNotch, { backgroundColor }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
@@ -164,12 +178,20 @@ const styles = StyleSheet.create({
   bookmarkButtonDark: {
     backgroundColor: '#2C2C2E',
   },
-  bookmarkText: {
-    fontSize: 20,
-    color: '#000000',
+  bookmarkIcon: {
+    width: 15,
+    height: 21,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    overflow: 'hidden',
   },
-  bookmarkTextDark: {
-    color: '#FFFFFF',
+  bookmarkNotch: {
+    position: 'absolute',
+    bottom: -5,
+    width: 10,
+    height: 10,
+    alignSelf: 'center',
+    transform: [{ rotate: '45deg' }],
   },
   spinner: {
     marginLeft: 12,

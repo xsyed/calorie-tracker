@@ -38,6 +38,11 @@ export {
   insertWaterEntry,
   setDailyWaterGoal,
 } from './waterRepository';
+export {
+  deleteWeightEntry,
+  getWeightEntries,
+  insertWeightEntry,
+} from './weightRepository';
 export type {
   User,
   OnboardingFormData,
@@ -48,6 +53,7 @@ export type {
   AppSetting,
   WaterEntry,
   WaterDailyTotal,
+  WeightEntry,
   SavedMeal,
   SavedMealItem,
   SavedMealWithItems,

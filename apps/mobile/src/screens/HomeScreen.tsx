@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
@@ -41,11 +43,14 @@ import {
   getDailyExerciseCalories,
   saveFoodEntryAsSavedMeal,
 } from '../database';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, RootTabParamList } from '../navigation/types';
 import { parseFoodText } from '../services';
 import type { ParseErrorCode } from '../services';
 
-type HomeNavigation = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type HomeNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<RootTabParamList, 'Home'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 function getTodayDate(): string {
   const now = new Date();

@@ -83,6 +83,21 @@ export function initDatabase(): DB {
     [],
   );
   db.executeSync(
+    'CREATE TABLE IF NOT EXISTS weight_entries (' +
+      'id TEXT PRIMARY KEY, ' +
+      'user_id TEXT NOT NULL, ' +
+      'date TEXT NOT NULL, ' +
+      'weight_kg REAL NOT NULL, ' +
+      'timestamp TEXT NOT NULL' +
+      ')',
+    [],
+  );
+  db.executeSync(
+    'CREATE INDEX IF NOT EXISTS idx_weight_entries_user_date ' +
+      'ON weight_entries(user_id, date)',
+    [],
+  );
+  db.executeSync(
     'CREATE TABLE IF NOT EXISTS saved_meals (' +
       'id TEXT PRIMARY KEY, ' +
       'user_id TEXT NOT NULL, ' +

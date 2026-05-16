@@ -77,6 +77,14 @@ export interface WaterDailyTotal {
   total_ml: number;
 }
 
+export interface WeightEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  weight_kg: number;
+  timestamp: string;
+}
+
 export interface SavedMeal {
   id: string;
   user_id: string;
