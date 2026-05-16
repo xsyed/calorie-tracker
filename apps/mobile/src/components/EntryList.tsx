@@ -98,13 +98,16 @@ export default function EntryList({
   onOpenEntryActions,
 }: EntryListProps) {
   const isDark = useColorScheme() === 'dark';
+  const exerciseFoodEntryIds = new Set(exerciseEntries.map((entry) => entry.foodEntryId));
 
   const timeline: TimelineItem[] = [
-    ...foodEntries.map((entry) => ({
-      type: 'food' as const,
-      entry,
-      ts: entry.createdAt,
-    })),
+    ...foodEntries
+      .filter((entry) => shouldShowFoodEntry(entry, exerciseFoodEntryIds))
+      .map((entry) => ({
+        type: 'food' as const,
+        entry,
+        ts: entry.createdAt,
+      })),
     ...exerciseEntries.map((entry) => ({
       type: 'exercise' as const,
       entry,
@@ -172,13 +175,14 @@ function renderFoodEntry(
       {isCompleteEntry(entry) && entry.items.length > 0 && (
         <View style={styles.itemsList}>
           {entry.items.map((item) => (
-            <Text
-              key={item.id}
-              style={[styles.itemText, isDark && styles.itemTextDark]}
-            >
-              {'\u2022'} {item.name}  {item.calories} kcal  P{item.proteinG} C
-              {item.carbsG} F{item.fatG}
-            </Text>
+            <View key={item.id} style={styles.itemRow}>
+              <Text style={[styles.itemText, isDark && styles.itemTextDark]}>
+                {'\u2022'} {item.name}
+              </Text>
+              <Text style={[styles.itemSummaryText, isDark && styles.itemTextDark]}>
+                {formatFoodItemSummary(item)}
+              </Text>
+            </View>
           ))}
         </View>
       )}
@@ -210,8 +214,35 @@ function renderFoodEntry(
   );
 }
 
+function shouldShowFoodEntry(entry: EntryListFoodEntry, exerciseFoodEntryIds: Set<string | null>): boolean {
+  return !isCompleteEntry(entry) || entry.items.length > 0 || !exerciseFoodEntryIds.has(entry.id);
+}
+
 function isCompleteEntry(entry: EntryListFoodEntry): boolean {
   return entry.status === 'complete';
+}
+
+function formatFoodItemSummary(item: EntryListFoodEntry['items'][number]): string {
+  return [
+    `${formatNumber(item.calories)} kcal`,
+    ...formatMacroParts(item),
+  ].join(' \u00b7 ');
+}
+
+function formatMacroParts(item: EntryListFoodEntry['items'][number]): string[] {
+  return [
+    formatMacroPart('P', item.proteinG),
+    formatMacroPart('C', item.carbsG),
+    formatMacroPart('F', item.fatG),
+  ].filter((part): part is string => part !== null);
+}
+
+function formatMacroPart(label: string, value: number): string | null {
+  return value > 0 ? `${label}${formatNumber(value)}g` : null;
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
 }
 
 function renderExerciseEntry(
@@ -275,10 +306,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingLeft: 4,
   },
+  itemRow: {
+    marginBottom: 4,
+  },
   itemText: {
     fontSize: 13,
     color: '#666666',
-    marginBottom: 3,
+  },
+  itemSummaryText: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 1,
   },
   itemTextDark: {
     color: '#999999',
