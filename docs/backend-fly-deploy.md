@@ -108,3 +108,5 @@ After choosing the real Fly app name, update that constant to `https://<app-name
 
 - Logs include status codes, timeout categories, Firebase error codes, and short token hashes where useful. They must not include `OPENROUTER_API_KEY`, Firebase service-account JSON, private keys, or full bearer tokens.
 - OpenRouter timeouts, malformed JSON, and upstream auth failures are logged outside the health path.
+
+IMPORTANT: OPENROUTER key will expired 90 days. (August, 2026) and also Github actions token will expired 30 days. (june, 2026)

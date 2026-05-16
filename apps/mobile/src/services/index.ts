@@ -68,7 +68,17 @@ export type {
   ParseResult,
   ParseErrorCode,
 } from './llmService';
-export { flushQueue } from './queueFlusher';
+export { editFoodEntryWithPrompt } from './foodEntryEditService';
+export type {
+  EditFoodEntryErrorCode,
+  EditFoodEntryFailure,
+  EditFoodEntryOptions,
+  EditFoodEntryProgress,
+  EditFoodEntryProgressStep,
+  EditFoodEntryResult,
+  EditFoodEntrySuccess,
+} from './foodEntryEditService';
+export { flushQueue, isQueueFlushing } from './queueFlusher';
 export {
   cancelScheduledMealReminders,
   MealReminderSchedulingError,

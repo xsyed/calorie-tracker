@@ -56,14 +56,17 @@ export function initDatabase(): DB {
     'CREATE TABLE IF NOT EXISTS exercise_entries (' +
       'id TEXT PRIMARY KEY, ' +
       'user_id TEXT NOT NULL, ' +
+      'food_entry_id TEXT, ' +
       'date TEXT NOT NULL, ' +
       'exercise_type TEXT NOT NULL, ' +
       'duration_minutes REAL NOT NULL, ' +
       'calories_burned REAL NOT NULL, ' +
-      'timestamp TEXT NOT NULL' +
+      'timestamp TEXT NOT NULL, ' +
+      'FOREIGN KEY (food_entry_id) REFERENCES food_entries(id)' +
       ')',
     [],
   );
+  ensureExerciseFoodEntryIdColumn(db);
   db.executeSync(
     'CREATE TABLE IF NOT EXISTS app_settings (' +
       'key TEXT PRIMARY KEY, ' +
@@ -183,6 +186,20 @@ function ensureUserActivityMultiplierColumn(database: DB): void {
   if (!hasActivityMultiplier) {
     database.executeSync(
       'ALTER TABLE User ADD COLUMN activity_multiplier REAL NOT NULL DEFAULT 1.2',
+      [],
+    );
+  }
+}
+
+function ensureExerciseFoodEntryIdColumn(database: DB): void {
+  const result = database.executeSync('PRAGMA table_info(exercise_entries)', []);
+  const hasFoodEntryId = result.rows.some(
+    (row) => row.name === 'food_entry_id',
+  );
+
+  if (!hasFoodEntryId) {
+    database.executeSync(
+      'ALTER TABLE exercise_entries ADD COLUMN food_entry_id TEXT REFERENCES food_entries(id)',
       [],
     );
   }

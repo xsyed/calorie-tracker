@@ -17,6 +17,7 @@ export interface EntryListFoodEntry {
 
 export interface EntryListExerciseEntry {
   id: string;
+  foodEntryId: string | null;
   type: string;
   durationMinutes: number;
   caloriesBurned: number;
@@ -26,9 +27,7 @@ export interface EntryListExerciseEntry {
 interface EntryListProps {
   foodEntries: EntryListFoodEntry[];
   exerciseEntries: EntryListExerciseEntry[];
-  onRetryEntry?: (entryId: string) => void;
-  onEditEntry?: (entryId: string) => void;
-  onSaveEntryAsMeal?: (entryId: string) => void;
+  onOpenEntryActions: (entryId: string) => void;
 }
 
 type TimelineItem =
@@ -96,9 +95,7 @@ function StatusBadge({ status, isDark }: { status: string; isDark: boolean }) {
 export default function EntryList({
   foodEntries,
   exerciseEntries,
-  onRetryEntry,
-  onEditEntry,
-  onSaveEntryAsMeal,
+  onOpenEntryActions,
 }: EntryListProps) {
   const isDark = useColorScheme() === 'dark';
 
@@ -135,7 +132,11 @@ export default function EntryList({
       </Text>
       {timeline.map((item, _index) => {
         if (item.type === 'food') {
-          return renderFoodEntry(item.entry, isDark, onRetryEntry, onEditEntry, onSaveEntryAsMeal);
+          return renderFoodEntry(
+            item.entry,
+            isDark,
+            onOpenEntryActions,
+          );
         }
         return renderExerciseEntry(item.entry, isDark);
       })}
@@ -146,15 +147,11 @@ export default function EntryList({
 function renderFoodEntry(
   entry: EntryListFoodEntry,
   isDark: boolean,
-  onRetryEntry?: (entryId: string) => void,
-  onEditEntry?: (entryId: string) => void,
-  onSaveEntryAsMeal?: (entryId: string) => void,
+  onOpenEntryActions: (entryId: string) => void,
 ) {
   const isFailed = entry.status === 'failed';
   const isPending = entry.status === 'pending';
   const isDimmed = isFailed || isPending;
-  const isPressable = isFailed && onRetryEntry !== undefined;
-  const canSaveAsMeal = isCompleteEntry(entry) && entry.items.length > 0 && onSaveEntryAsMeal !== undefined;
 
   const content = (
     <View style={[styles.card, isDark && styles.cardDark]}>
@@ -200,51 +197,17 @@ function renderFoodEntry(
 
       {isFailed && (
         <Text style={[styles.subtext, isDark && styles.subtextDark]}>
-          Tap to retry or edit
+          Tap for entry actions
         </Text>
-      )}
-
-      {canSaveAsMeal && (
-        <View style={styles.actionRow}>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => onSaveEntryAsMeal(entry.id)}
-            hitSlop={8}
-          >
-            <Text style={styles.actionButtonText}>Save as Meal</Text>
-          </Pressable>
-        </View>
       )}
     </View>
   );
 
-  if (isPressable) {
-    return (
-      <Pressable
-        key={`food-${entry.id}`}
-        onPress={() => {
-          onRetryEntry?.(entry.id);
-          onEditEntry?.(entry.id);
-        }}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-
-  if (canSaveAsMeal) {
-    return (
-      <Pressable
-        key={`food-${entry.id}`}
-        onLongPress={() => onSaveEntryAsMeal(entry.id)}
-        delayLongPress={350}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-
-  return <View key={`food-${entry.id}`}>{content}</View>;
+  return (
+    <Pressable key={`food-${entry.id}`} onPress={() => onOpenEntryActions(entry.id)}>
+      {content}
+    </Pressable>
+  );
 }
 
 function isCompleteEntry(entry: EntryListFoodEntry): boolean {
@@ -336,22 +299,6 @@ const styles = StyleSheet.create({
   },
   processingTextDark: {
     color: '#666666',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   emptyTitle: {
     fontSize: 16,

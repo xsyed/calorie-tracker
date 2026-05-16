@@ -5,6 +5,7 @@ function mapRowToExerciseEntry(row: Record<string, unknown>): ExerciseEntry {
   return {
     id: row.id as string,
     user_id: row.user_id as string,
+    food_entry_id: (row.food_entry_id as string | null) ?? null,
     date: row.date as string,
     exercise_type: row.exercise_type as string,
     duration_minutes: row.duration_minutes as number,
@@ -13,18 +14,23 @@ function mapRowToExerciseEntry(row: Record<string, unknown>): ExerciseEntry {
   };
 }
 
+type InsertExerciseEntryData = Omit<ExerciseEntry, 'id' | 'food_entry_id'> & {
+  food_entry_id?: string | null;
+};
+
 export async function insertExerciseEntry(
-  data: Omit<ExerciseEntry, 'id'>,
+  data: InsertExerciseEntryData,
 ): Promise<ExerciseEntry> {
   const db = initDatabase();
   const id =
     Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
   await db.execute(
-    `INSERT INTO exercise_entries (id, user_id, date, exercise_type, duration_minutes, calories_burned, timestamp)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO exercise_entries (id, user_id, food_entry_id, date, exercise_type, duration_minutes, calories_burned, timestamp)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       data.user_id,
+      data.food_entry_id ?? null,
       data.date,
       data.exercise_type,
       data.duration_minutes,
@@ -32,7 +38,7 @@ export async function insertExerciseEntry(
       data.timestamp,
     ],
   );
-  return { id, ...data };
+  return { ...data, id, food_entry_id: data.food_entry_id ?? null };
 }
 
 export async function getExerciseEntriesByDate(

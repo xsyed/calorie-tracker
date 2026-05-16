@@ -53,11 +53,18 @@ export interface FoodEntryWithItems {
 export interface ExerciseEntry {
   id: string;
   user_id: string;
+  food_entry_id: string | null;
   date: string;
   exercise_type: string;
   duration_minutes: number;
   calories_burned: number;
   timestamp: string;
+}
+
+export interface DeletedFoodEntrySnapshot {
+  entry: FoodEntry;
+  items: FoodItem[];
+  exerciseEntries: ExerciseEntry[];
 }
 
 export interface AppSetting {

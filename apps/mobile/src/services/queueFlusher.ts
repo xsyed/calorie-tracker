@@ -12,6 +12,10 @@ import {
 
 let isFlushing = false;
 
+export function isQueueFlushing(): boolean {
+  return isFlushing;
+}
+
 interface FlushResult {
   successCount: number;
   failureCount: number;

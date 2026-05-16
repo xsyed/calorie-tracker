@@ -21,7 +21,13 @@ export {
   completePendingEntry,
   getDailyCalorieTotals,
   getLoggedDatesInRange,
+  deleteFoodEntryWithSnapshot,
+  restoreDeletedFoodEntry,
 } from './foodRepository';
+export {
+  getFoodEntryForUser,
+  replaceFoodEntryParsedData,
+} from './foodEntryEditRepository';
 export {
   insertExerciseEntry,
   getExerciseEntriesByDate,
@@ -68,6 +74,7 @@ export type {
   FoodEntry,
   FoodEntryWithItems,
   FoodItem,
+  DeletedFoodEntrySnapshot,
   ExerciseEntry,
   AppSetting,
   BackupMetadata,

@@ -19,6 +19,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../auth';
 import DailySummary from '../components/DailySummary';
 import DateStrip from '../components/DateStrip';
+import EditFoodEntryPrompt from '../components/EditFoodEntryPrompt';
+import EntryActionsPrompt from '../components/EntryActionsPrompt';
 import EntryList from '../components/EntryList';
 import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
 import HistorySavedMealsOverlay from '../components/HistorySavedMealsOverlay';
@@ -42,10 +44,13 @@ import {
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
   saveFoodEntryAsSavedMeal,
+  deleteFoodEntryWithSnapshot,
+  restoreDeletedFoodEntry,
 } from '../database';
+import type { DeletedFoodEntrySnapshot } from '../database';
 import type { RootStackParamList, RootTabParamList } from '../navigation/types';
-import { parseFoodText } from '../services';
-import type { ParseErrorCode } from '../services';
+import { editFoodEntryWithPrompt, isQueueFlushing, parseFoodText } from '../services';
+import type { EditFoodEntryProgressStep, ParseErrorCode } from '../services';
 
 type HomeNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<RootTabParamList, 'Home'>,
@@ -53,6 +58,15 @@ type HomeNavigation = CompositeNavigationProp<
 >;
 
 type HomeRoute = RouteProp<RootTabParamList, 'Home'>;
+
+const DELETE_UNDO_MS = 6000;
+
+interface HomeDailyTotals {
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+}
 
 function getTodayDate(): string {
   const now = new Date();
@@ -119,6 +133,92 @@ function mapErrorToUserMessage(code: ParseErrorCode): string {
   }
 }
 
+function getEditProgressLabel(step: EditFoodEntryProgressStep): string {
+  switch (step) {
+    case 'checking_connectivity':
+      return 'Checking connection...';
+    case 'parsing':
+      return 'Re-submitting to LLM...';
+    case 'replacing':
+      return 'Replacing entry...';
+  }
+}
+
+function getEntryTotals(entry: EntryListFoodEntry): HomeDailyTotals {
+  return entry.items.reduce(
+    (totals, item) => ({
+      totalCalories: totals.totalCalories + item.calories,
+      totalProtein: totals.totalProtein + item.proteinG,
+      totalCarbs: totals.totalCarbs + item.carbsG,
+      totalFat: totals.totalFat + item.fatG,
+    }),
+    {
+      totalCalories: 0,
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFat: 0,
+    },
+  );
+}
+
+function subtractEntryTotals(
+  totals: HomeDailyTotals,
+  entry: EntryListFoodEntry,
+): HomeDailyTotals {
+  const entryTotals = getEntryTotals(entry);
+  return {
+    totalCalories: totals.totalCalories - entryTotals.totalCalories,
+    totalProtein: totals.totalProtein - entryTotals.totalProtein,
+    totalCarbs: totals.totalCarbs - entryTotals.totalCarbs,
+    totalFat: totals.totalFat - entryTotals.totalFat,
+  };
+}
+
+function addEntryTotals(
+  totals: HomeDailyTotals,
+  entry: EntryListFoodEntry,
+): HomeDailyTotals {
+  const entryTotals = getEntryTotals(entry);
+  return {
+    totalCalories: totals.totalCalories + entryTotals.totalCalories,
+    totalProtein: totals.totalProtein + entryTotals.totalProtein,
+    totalCarbs: totals.totalCarbs + entryTotals.totalCarbs,
+    totalFat: totals.totalFat + entryTotals.totalFat,
+  };
+}
+
+function mapDeletedSnapshotToFoodEntry(
+  snapshot: DeletedFoodEntrySnapshot,
+): EntryListFoodEntry {
+  return {
+    id: snapshot.entry.id,
+    rawText: snapshot.entry.raw_text,
+    status: snapshot.entry.status,
+    createdAt: snapshot.entry.created_at,
+    items: snapshot.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      calories: item.calories,
+      proteinG: item.protein_g,
+      carbsG: item.carbs_g,
+      fatG: item.fat_g,
+    })),
+  };
+}
+
+function mapDeletedSnapshotToExerciseEntries(
+  snapshot: DeletedFoodEntrySnapshot,
+): EntryListExerciseEntry[] {
+  return snapshot.exerciseEntries.map((entry) => ({
+    id: entry.id,
+    foodEntryId: entry.food_entry_id,
+    type: entry.exercise_type,
+    durationMinutes: entry.duration_minutes,
+    caloriesBurned: entry.calories_burned,
+    timestamp: entry.timestamp,
+  }));
+}
+
 export default function HomeScreen() {
   const auth = useAuth();
   const navigation = useNavigation<HomeNavigation>();
@@ -133,6 +233,7 @@ export default function HomeScreen() {
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputBarRef = useRef<InputBarHandle>(null);
   const handledFocusRequestIdRef = useRef<string | null>(null);
+  const deleteUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const selectedDateRef = useRef(selectedDate);
@@ -163,6 +264,16 @@ export default function HomeScreen() {
   const [saveMealName, setSaveMealName] = useState('');
   const [saveMealError, setSaveMealError] = useState<string | null>(null);
   const [isSavingMeal, setIsSavingMeal] = useState(false);
+  const [pendingDeletedEntry, setPendingDeletedEntry] =
+    useState<DeletedFoodEntrySnapshot | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+  const [actionEntryId, setActionEntryId] = useState<string | null>(null);
+  const [isEntryQueueActive, setIsEntryQueueActive] = useState(false);
+  const [editEntryId, setEditEntryId] = useState<string | null>(null);
+  const [editPrompt, setEditPrompt] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editProgressLabel, setEditProgressLabel] = useState<string | null>(null);
+  const [isEditingEntry, setIsEditingEntry] = useState(false);
 
   useEffect(() => {
     if (auth.user) {
@@ -189,6 +300,12 @@ export default function HomeScreen() {
       if (errorTimerRef.current !== null) clearTimeout(errorTimerRef.current);
     };
   }, [error]);
+
+  useEffect(() => () => {
+    if (deleteUndoTimerRef.current !== null) {
+      clearTimeout(deleteUndoTimerRef.current);
+    }
+  }, []);
 
   const loadDataForDate = useCallback(async (date: string) => {
     const uid = userIdRef.current;
@@ -243,6 +360,7 @@ export default function HomeScreen() {
       setExerciseEntries(
         exerciseEntriesResult.map((entry) => ({
           id: entry.id,
+          foodEntryId: entry.food_entry_id,
           type: entry.exercise_type,
           durationMinutes: entry.duration_minutes,
           caloriesBurned: entry.calories_burned,
@@ -450,7 +568,86 @@ export default function HomeScreen() {
     loadDataForDate(selectedDateRef.current);
   }, [loadDataForDate]);
 
+  const handleOpenEntryActions = useCallback((entryId: string) => {
+    setActionEntryId(entryId);
+    setIsEntryQueueActive(isQueueFlushing());
+    setEditError(null);
+  }, []);
+
+  const handleCloseEntryActions = useCallback(() => {
+    setActionEntryId(null);
+  }, []);
+
+  const handleOpenEditPrompt = useCallback(() => {
+    if (isEditingEntry || actionEntryId === null) return;
+
+    const entry = foodEntries.find((currentEntry) => currentEntry.id === actionEntryId);
+    if (entry === undefined || entry.status !== 'complete' || isQueueFlushing()) {
+      setIsEntryQueueActive(isQueueFlushing());
+      return;
+    }
+
+    setActionEntryId(null);
+    setEditEntryId(entry.id);
+    setEditPrompt(entry.rawText);
+    setEditError(null);
+    setEditProgressLabel(null);
+  }, [actionEntryId, foodEntries, isEditingEntry]);
+
+  const handleCancelEditPrompt = useCallback(() => {
+    if (isEditingEntry) return;
+
+    setEditEntryId(null);
+    setEditPrompt('');
+    setEditError(null);
+    setEditProgressLabel(null);
+  }, [isEditingEntry]);
+
+  const handleChangeEditPrompt = useCallback((prompt: string) => {
+    setEditPrompt(prompt);
+    setEditError(null);
+  }, []);
+
+  const handleSubmitEditPrompt = useCallback(async () => {
+    const userId = userIdRef.current;
+    const prompt = editPrompt.trim();
+    if (editEntryId === null || userId === null || prompt.length === 0 || isEditingEntry) return;
+
+    setIsEditingEntry(true);
+    setEditError(null);
+    setEditProgressLabel('Starting edit...');
+
+    try {
+      const result = await editFoodEntryWithPrompt({
+        userId,
+        foodEntryId: editEntryId,
+        rawPrompt: prompt,
+        options: {
+          onProgress: (progress) => {
+            setEditProgressLabel(getEditProgressLabel(progress.step));
+          },
+        },
+      });
+
+      if (result.status === 'error') {
+        setEditError(result.message);
+        return;
+      }
+
+      setEditEntryId(null);
+      setEditPrompt('');
+      setEditError(null);
+      setEditProgressLabel(null);
+      loadDataForDate(selectedDateRef.current);
+    } catch {
+      setEditError('Food entry edit failed.');
+    } finally {
+      setIsEditingEntry(false);
+    }
+  }, [editEntryId, editPrompt, isEditingEntry, loadDataForDate]);
+
   const handleOpenSaveMealPrompt = useCallback((entryId: string) => {
+    setActionEntryId(null);
     setSaveMealEntryId(entryId);
     setSaveMealName('');
     setSaveMealError(null);
@@ -495,6 +692,124 @@ export default function HomeScreen() {
       setIsSavingMeal(false);
     }
   }, [saveMealEntryId, saveMealName]);
+
+  const clearDeleteUndo = useCallback(() => {
+    if (deleteUndoTimerRef.current !== null) {
+      clearTimeout(deleteUndoTimerRef.current);
+      deleteUndoTimerRef.current = null;
+    }
+    setPendingDeletedEntry(null);
+    setDeleteNotice(null);
+  }, []);
+
+  const restoreDeletedEntryInState = useCallback((
+    entry: EntryListFoodEntry,
+    linkedExercises: EntryListExerciseEntry[],
+  ) => {
+    setFoodEntries((currentEntries) => {
+      if (currentEntries.some((currentEntry) => currentEntry.id === entry.id)) {
+        return currentEntries;
+      }
+      return [...currentEntries, entry].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    });
+    setExerciseEntries((currentEntries) => {
+      const currentIds = new Set(currentEntries.map((currentEntry) => currentEntry.id));
+      return [
+        ...currentEntries,
+        ...linkedExercises.filter((exercise) => !currentIds.has(exercise.id)),
+      ];
+    });
+    setDailyTotals((currentTotals) => addEntryTotals(currentTotals, entry));
+    setExerciseCalories((currentCalories) => (
+      currentCalories + linkedExercises.reduce((total, exercise) => total + exercise.caloriesBurned, 0)
+    ));
+  }, []);
+
+  const removeDeletedEntryFromState = useCallback((
+    entry: EntryListFoodEntry,
+    linkedExercises: EntryListExerciseEntry[],
+  ) => {
+    setFoodEntries((currentEntries) => currentEntries.filter((currentEntry) => currentEntry.id !== entry.id));
+    setExerciseEntries((currentEntries) => (
+      currentEntries.filter((currentEntry) => currentEntry.foodEntryId !== entry.id)
+    ));
+    setDailyTotals((currentTotals) => subtractEntryTotals(currentTotals, entry));
+    setExerciseCalories((currentCalories) => (
+      currentCalories - linkedExercises.reduce((total, exercise) => total + exercise.caloriesBurned, 0)
+    ));
+  }, []);
+
+  const handleDeleteEntry = useCallback(async (entryId: string) => {
+    const userId = userIdRef.current;
+    const entry = foodEntries.find((currentEntry) => currentEntry.id === entryId);
+    if (userId === null || entry === undefined || entry.status !== 'complete') return;
+
+    const linkedExercises = exerciseEntries.filter((exercise) => exercise.foodEntryId === entryId);
+    clearDeleteUndo();
+    setError(null);
+    setSaveMealEntryId((currentEntryId) => (currentEntryId === entryId ? null : currentEntryId));
+    setActionEntryId((currentEntryId) => (currentEntryId === entryId ? null : currentEntryId));
+    setEditEntryId((currentEntryId) => (currentEntryId === entryId ? null : currentEntryId));
+    setEditError(null);
+    removeDeletedEntryFromState(entry, linkedExercises);
+
+    try {
+      const snapshot = await deleteFoodEntryWithSnapshot(userId, entryId);
+      setPendingDeletedEntry(snapshot);
+      setDeleteNotice('Entry deleted.');
+      deleteUndoTimerRef.current = setTimeout(() => {
+        deleteUndoTimerRef.current = null;
+        setPendingDeletedEntry(null);
+        setDeleteNotice(null);
+      }, DELETE_UNDO_MS);
+    } catch {
+      restoreDeletedEntryInState(entry, linkedExercises);
+      setError('Failed to delete entry. Try again.');
+    }
+  }, [
+    clearDeleteUndo,
+    exerciseEntries,
+    foodEntries,
+    removeDeletedEntryFromState,
+    restoreDeletedEntryInState,
+  ]);
+
+  const handleUndoDelete = useCallback(async () => {
+    const snapshot = pendingDeletedEntry;
+    if (snapshot === null) return;
+
+    clearDeleteUndo();
+    try {
+      await restoreDeletedFoodEntry(snapshot);
+      if (selectedDateRef.current === snapshot.entry.date) {
+        restoreDeletedEntryInState(
+          mapDeletedSnapshotToFoodEntry(snapshot),
+          mapDeletedSnapshotToExerciseEntries(snapshot),
+        );
+      }
+    } catch {
+      setError('Failed to restore entry. Try again.');
+      loadDataForDate(selectedDateRef.current);
+    }
+  }, [clearDeleteUndo, loadDataForDate, pendingDeletedEntry, restoreDeletedEntryInState]);
+
+  const actionEntry = useMemo(
+    () => foodEntries.find((entry) => entry.id === actionEntryId) ?? null,
+    [actionEntryId, foodEntries],
+  );
+
+  const actionEntryExercises = useMemo(
+    () => {
+      if (actionEntryId === null) return [];
+      return exerciseEntries.filter((entry) => entry.foodEntryId === actionEntryId);
+    },
+    [actionEntryId, exerciseEntries],
+  );
+
+  const editEntry = useMemo(
+    () => foodEntries.find((entry) => entry.id === editEntryId) ?? null,
+    [editEntryId, foodEntries],
+  );
 
   const hasEntries = useMemo(
     () => foodEntries.length > 0 || exerciseEntries.length > 0,
@@ -575,7 +890,7 @@ export default function HomeScreen() {
             <EntryList
               foodEntries={foodEntries}
               exerciseEntries={exerciseEntries}
-              onSaveEntryAsMeal={handleOpenSaveMealPrompt}
+              onOpenEntryActions={handleOpenEntryActions}
             />
           </ScrollView>
         )}
@@ -588,6 +903,19 @@ export default function HomeScreen() {
           >
             {error}
           </Text>
+        </View>
+      )}
+
+      {deleteNotice !== null && (
+        <View style={[styles.deleteNotice, isDarkMode && styles.deleteNoticeDark]}>
+          <Text style={[styles.deleteNoticeText, isDarkMode && styles.deleteNoticeTextDark]}>
+            {deleteNotice}
+          </Text>
+          {pendingDeletedEntry !== null && (
+            <Pressable onPress={handleUndoDelete} style={styles.undoButton}>
+              <Text style={styles.undoButtonText}>Undo</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -613,6 +941,31 @@ export default function HomeScreen() {
         onDismiss={handleHistoryOverlayDismiss}
         onApplied={handleHistoryOverlayApplied}
       />
+      {actionEntry !== null && (
+        <EntryActionsPrompt
+          entry={actionEntry}
+          linkedExercises={actionEntryExercises}
+          isDark={isDarkMode}
+          isQueueActive={isEntryQueueActive}
+          onClose={handleCloseEntryActions}
+          onEdit={handleOpenEditPrompt}
+          onSaveAsMeal={() => handleOpenSaveMealPrompt(actionEntry.id)}
+          onDelete={() => handleDeleteEntry(actionEntry.id)}
+        />
+      )}
+      {editEntry !== null && (
+        <EditFoodEntryPrompt
+          isDark={isDarkMode}
+          prompt={editPrompt}
+          originalPrompt={editEntry.rawText}
+          error={editError}
+          progressLabel={editProgressLabel}
+          isSaving={isEditingEntry}
+          onChangePrompt={handleChangeEditPrompt}
+          onCancel={handleCancelEditPrompt}
+          onSubmit={handleSubmitEditPrompt}
+        />
+      )}
       {saveMealEntryId !== null && (
         <SaveMealPrompt
           isDark={isDarkMode}
@@ -726,6 +1079,40 @@ const styles = StyleSheet.create({
   },
   errorTextDark: {
     color: '#FF4444',
+  },
+  deleteNotice: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F5F5F5',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#DDDDDD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  deleteNoticeDark: {
+    backgroundColor: '#1C1C1E',
+    borderTopColor: '#333333',
+  },
+  deleteNoticeText: {
+    fontSize: 14,
+    color: '#333333',
+    flex: 1,
+  },
+  deleteNoticeTextDark: {
+    color: '#F5F5F5',
+  },
+  undoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  undoButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   inputBarWrapper: {
     backgroundColor: '#FFFFFF',
