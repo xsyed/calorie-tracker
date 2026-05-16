@@ -85,7 +85,7 @@ Free-tier cold starts are accepted for v1 because `auto_stop_machines = "stop"` 
 
 2. In GitHub, open the repository settings and add an Actions secret named `FLY_API_TOKEN`. Paste the whole token, including the `FlyV1` prefix.
 
-3. Push to `main`. `.github/workflows/fly-backend.yml` deploys when backend, Fly config, lockfile, or workflow files change.
+3. Push to `master`. `.github/workflows/fly-backend.yml` deploys when backend, Fly config, lockfile, or workflow files change.
 
 ## Android Backend URL
 

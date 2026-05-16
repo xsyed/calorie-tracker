@@ -3,7 +3,7 @@ name: Fly Backend Deploy
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - ".github/workflows/fly-backend.yml"
       - "apps/backend/**"
