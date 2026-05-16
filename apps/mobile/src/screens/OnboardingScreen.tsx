@@ -55,6 +55,7 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [skipRestorePrompt, setSkipRestorePrompt] = useState(false);
+  const showStepNavigation = step !== 'safety_gate' && step !== 'summary';
 
   const startFresh = useCallback(() => {
     setSkipRestorePrompt(true);
@@ -203,7 +204,7 @@ export default function OnboardingScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDarkMode && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -220,53 +221,54 @@ export default function OnboardingScreen() {
 
             <View style={styles.stepBody}>{renderStepContent()}</View>
           </View>
-
-          {step !== 'safety_gate' && step !== 'summary' && (
-            <View style={styles.navRow}>
-              {step !== 'gender' ? (
-                <Pressable
-                  onPress={goBack}
-                  style={[
-                    s.button,
-                    styles.navButton,
-                    isDarkMode ? s.buttonSecondaryDark : s.buttonSecondaryLight,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back"
-                >
-                  <Text style={[s.buttonText, isDarkMode && s.buttonTextDark]}>
-                    Back
-                  </Text>
-                </Pressable>
-              ) : (
-                <View style={styles.navButtonPlaceholder} />
-              )}
+        </View>
+      </ScrollView>
+      {showStepNavigation && (
+        <View style={[styles.navWrapper, isDarkMode && styles.navWrapperDark]}>
+          <View style={styles.navRow}>
+            {step !== 'gender' ? (
               <Pressable
-                onPress={goNext}
-                disabled={!canAdvance}
+                onPress={goBack}
                 style={[
                   s.button,
                   styles.navButton,
-                  s.buttonPrimary,
-                  isDarkMode ? s.buttonPrimaryDark : s.buttonPrimaryLight,
-                  !canAdvance && s.buttonDisabled,
+                  isDarkMode ? s.buttonSecondaryDark : s.buttonSecondaryLight,
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Next"
+                accessibilityLabel="Back"
               >
-                <Text
-                  style={[
-                    s.buttonText,
-                    isDarkMode ? s.buttonTextSecondaryDark : s.buttonTextSecondaryLight,
-                  ]}
-                >
-                  Next
+                <Text style={[s.buttonText, isDarkMode && s.buttonTextDark]}>
+                  Back
                 </Text>
               </Pressable>
-            </View>
-          )}
+            ) : (
+              <View style={styles.navButtonPlaceholder} />
+            )}
+            <Pressable
+              onPress={goNext}
+              disabled={!canAdvance}
+              style={[
+                s.button,
+                styles.navButton,
+                s.buttonPrimary,
+                isDarkMode ? s.buttonPrimaryDark : s.buttonPrimaryLight,
+                !canAdvance && s.buttonDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Next"
+            >
+              <Text
+                style={[
+                  s.buttonText,
+                  isDarkMode ? s.buttonTextSecondaryDark : s.buttonTextSecondaryLight,
+                ]}
+              >
+                Next
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -287,7 +289,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 24,
-    justifyContent: 'space-between',
   },
   stepContent: {
     flex: 1,
@@ -307,7 +308,18 @@ const styles = StyleSheet.create({
   navRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+  },
+  navWrapper: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+    backgroundColor: '#FFFFFF',
+  },
+  navWrapperDark: {
+    borderTopColor: '#1C1C1E',
+    backgroundColor: '#000000',
   },
   navButton: {
     flex: 1,

@@ -825,7 +825,7 @@ export default function HomeScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDarkMode && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.content, { paddingTop: insets.top }]}>
         <View style={styles.header}>
