@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit && npm run -w apps/mobile typecheck",
-    "lint": "eslint . --cache",
+    "typecheck": "tsc --noEmit && npm run -w apps/mobile typecheck && npm run -w @calories/backend typecheck",
+    "lint": "eslint . --cache && npm run -w @calories/backend lint",
     "knip": "knip",
     "duplication": "jscpd .",
     "deps": "depcruise apps packages --config .dependency-cruiser.js",

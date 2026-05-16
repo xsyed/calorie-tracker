@@ -8,6 +8,9 @@
     "apps/mobile": {
       "entry": ["src/auth/index.ts", "src/database/index.ts", "src/onboarding/index.ts", "src/services/index.ts"],
       "project": ["**/*.ts", "**/*.tsx"]
+    },
+    "apps/backend": {
+      "project": ["src/**/*.ts"]
     }
   },
   "ignoreIssues": {

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
+Monorepo (npm workspaces): `apps/mobile`, `apps/backend`, `packages/` (empty).
 
 **apps/mobile** — React Native 0.85.3 bare workflow, TypeScript strict.
 - **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
@@ -10,7 +10,13 @@ Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
 - **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding → Home → Weight → Water.
 - **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`. No UI library.
 
-No backend, no shared packages, no tests. Home supports food/exercise logging, saved meals/history, and water quick-add. Weight supports local weigh-in logging, summary/history, chart trends, delete undo, and edge states. Water has daily logging for selected date plus a local 7-day trend and grouped history. Other features (backend proxy) exist only as specs in `docs/features/`.
+**apps/backend** — Node.js/Express TypeScript LLM proxy for OpenRouter, deployable on Fly.io.
+- **Config:** Central env loader for OpenRouter, Firebase, rate-limit, model, port, and runtime env.
+- **Routes:** `GET /health` and `POST /api/parse`; bounded JSON body parsing, Firebase Auth verification, in-memory rate limiting, OpenRouter relay/response validation, and redacted operational logs.
+- **Deploy:** Fly.io `fly.toml`, backend Dockerfile, GitHub Actions deploy workflow, and deployment runbook in `docs/backend-fly-deploy.md`.
+- **Scope:** No database dependency, no business logic, no user data persistence.
+
+No shared packages, no tests. Home supports food/exercise logging, saved meals/history, and water quick-add. Weight supports local weigh-in logging, summary/history, chart trends, delete undo, and edge states. Water has daily logging for selected date plus a local 7-day trend and grouped history. Backend proxy deployment is configured for Fly.io; backend observability remains shallow and intentionally keeps OpenRouter checks outside `/health`.
 
 ---
 

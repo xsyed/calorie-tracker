@@ -1,0 +1,31 @@
+# Keep Fly backend builds small. The Dockerfile only needs the root npm
+# metadata, backend package metadata, backend source, and TypeScript configs.
+
+*
+
+!package.json
+!package-lock.json
+!tsconfig.json
+!apps/
+!apps/backend/
+!apps/backend/package.json
+!apps/backend/tsconfig.json
+!apps/backend/src/
+!apps/backend/src/**
+
+**/node_modules
+**/dist
+**/.eslintcache
+**/.eslintcache-*
+**/*.tsbuildinfo
+**/.DS_Store
+
+.git
+.github
+.husky
+.opencode
+docs
+tasks
+packages
+apps/mobile
+fly.toml

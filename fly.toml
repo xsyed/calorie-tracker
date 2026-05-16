@@ -1,0 +1,39 @@
+# fly.toml app configuration file generated for calories-api on 2026-05-16T12:16:20-06:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'calories-api'
+primary_region = 'yyz'
+
+[build]
+  dockerfile = 'apps/backend/Dockerfile'
+
+[env]
+  FIREBASE_PROJECT_ID = "calorie-tracker-8cffc"
+  NODE_ENV = "production"
+  OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
+  PORT = "8080"
+  RATE_LIMIT_MAX = "50"
+  RATE_LIMIT_WINDOW_MS = "86400000"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  # Keep free-tier idle Machines stopped. Use 1 only if paying to avoid cold starts.
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512

@@ -12,11 +12,11 @@ module.exports = {
       comment: "Features must not import from other features. Use shared packages.",
     },
     {
-      name: "no-api-imports-into-ui",
+      name: "no-backend-imports-into-ui",
       severity: "error",
       from: { path: "^packages/ui" },
-      to: { path: "^apps/api" },
-      comment: "UI packages must not import from the API.",
+      to: { path: "^apps/backend" },
+      comment: "UI packages must not import from the backend.",
     },
     {
       name: "no-apps-imports-into-packages",
@@ -26,9 +26,9 @@ module.exports = {
       comment: "Shared packages must not depend on apps.",
     },
     {
-      name: "no-mobile-imports-into-api",
+      name: "no-mobile-imports-into-backend",
       severity: "error",
-      from: { path: "^apps/api" },
+      from: { path: "^apps/backend" },
       to: { path: "^apps/mobile" },
       comment: "The backend must not import from the mobile app.",
     },
