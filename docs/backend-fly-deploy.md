@@ -77,9 +77,10 @@ Free-tier cold starts are accepted for v1 because `auto_stop_machines = "stop"` 
 ## GitHub Deploy Setup
 
 1. Create a Fly deploy token:
+   30 days is the max TTL, and the token must be recreated before it expires to avoid GitHub Action failures.
 
    ```sh
-   fly tokens create deploy -x 999999h
+   fly tokens create deploy -x 720h
    ```
 
 2. In GitHub, open the repository settings and add an Actions secret named `FLY_API_TOKEN`. Paste the whole token, including the `FlyV1` prefix.
