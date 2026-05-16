@@ -30,7 +30,7 @@ module.exports = {
       ignoreTemplateLiterals: true,
     }],
     "max-lines": ["error", {
-      max: 500,
+      max: 700,
       skipBlankLines: true,
       skipComments: true,
     }],

@@ -65,6 +65,19 @@ export interface AppSetting {
   value: string;
 }
 
+export interface BackupMetadata {
+  last_backup_at: string | null;
+  last_backup_size_bytes: number | null;
+  last_backup_checksum: string | null;
+  backup_count: number;
+}
+
+export interface BackupPreferences {
+  weekly_backup_enabled: boolean;
+  wifi_only: boolean;
+  max_backup_count: number;
+}
+
 export interface WaterEntry {
   id: string;
   user_id: string;

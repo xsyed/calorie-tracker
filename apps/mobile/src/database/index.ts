@@ -2,6 +2,14 @@ export { initDatabase } from './database';
 export { userExists, insertUser, getUser, updateUserSettings } from './userRepository';
 export type { UserSettingsUpdate } from './userRepository';
 export {
+  DEFAULT_MAX_BACKUP_COUNT,
+  getBackupMetadata,
+  getBackupPreferences,
+  saveBackupMetadata,
+  setBackupPreferences,
+} from './backupRepository';
+export type { BackupMetadataUpdate } from './backupRepository';
+export {
   insertFoodEntry,
   insertFoodItem,
   getFoodEntriesByDate,
@@ -52,6 +60,8 @@ export type {
   FoodItem,
   ExerciseEntry,
   AppSetting,
+  BackupMetadata,
+  BackupPreferences,
   WaterEntry,
   WaterDailyTotal,
   WeightEntry,

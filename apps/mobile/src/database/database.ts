@@ -1,11 +1,13 @@
 import { open } from '@op-engineering/op-sqlite';
 import type { DB } from '@op-engineering/op-sqlite';
 
+const DATABASE_NAME = 'calories.db';
+
 let db: DB | null = null;
 
 export function initDatabase(): DB {
   if (db) return db;
-  db = open({ name: 'calories.db' });
+  db = open({ name: DATABASE_NAME });
   db.executeSync(
     'CREATE TABLE IF NOT EXISTS User (' +
       'id TEXT PRIMARY KEY, ' +
@@ -70,6 +72,16 @@ export function initDatabase(): DB {
     [],
   );
   db.executeSync(
+    'CREATE TABLE IF NOT EXISTS backup_metadata (' +
+      'id TEXT PRIMARY KEY CHECK (id = \'current\'), ' +
+      'last_backup_at TEXT, ' +
+      'last_backup_size_bytes INTEGER, ' +
+      'last_backup_checksum TEXT, ' +
+      'backup_count INTEGER NOT NULL DEFAULT 0' +
+      ')',
+    [],
+  );
+  db.executeSync(
     'CREATE TABLE IF NOT EXISTS water_entries (' +
       'id TEXT PRIMARY KEY, ' +
       'user_id TEXT NOT NULL, ' +
@@ -123,6 +135,17 @@ export function initDatabase(): DB {
     [],
   );
   return db;
+}
+
+export function getDatabaseFilePath(): string {
+  return initDatabase().getDbPath();
+}
+
+export async function closeDatabase(): Promise<void> {
+  if (!db) return;
+  const currentDb = db;
+  await currentDb.closeAsync();
+  db = null;
 }
 
 function ensureUserActivityMultiplierColumn(database: DB): void {

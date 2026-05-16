@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  StyleSheet,
   Text,
   useColorScheme,
   View,
@@ -12,8 +11,22 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mapAuthErrorMessage, useAuth } from '../auth';
-import { getUser, updateUserSettings } from '../database';
+import {
+  getBackupMetadata,
+  getBackupPreferences,
+  getUser,
+  setBackupPreferences,
+  updateUserSettings,
+} from '../database';
+import type { BackupMetadata, BackupPreferences } from '../database';
 import type { RootStackParamList } from '../navigation/types';
+import {
+  runManualBackup,
+  syncPeriodicBackupSchedule,
+  type ManualBackupProgress,
+  type ManualBackupResult,
+} from '../services';
+import SettingsBackupSection, { formatBytes } from './SettingsBackupSection';
 import SettingsForm from './SettingsForm';
 import type { SettingsTextFieldKey } from './SettingsForm';
 import {
@@ -29,6 +42,7 @@ import type {
   SettingsValidationErrors,
   SettingsValidationField,
 } from './settingsFormUtils';
+import styles from './SettingsScreen.styles';
 
 type SettingsScreenProps = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 type LoadState = 'loading' | 'ready' | 'missing' | 'error';
@@ -43,8 +57,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [hasManualMacroEdits, setHasManualMacroEdits] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [backupMetadata, setBackupMetadata] = useState<BackupMetadata | null>(null);
+  const [backupPreferences, setBackupPreferencesState] =
+    useState<BackupPreferences | null>(null);
+  const [backupProgress, setBackupProgress] =
+    useState<ManualBackupProgress | null>(null);
+  const [backupStatusMessage, setBackupStatusMessage] = useState<string | null>(null);
+  const [backupErrorMessage, setBackupErrorMessage] = useState<string | null>(null);
   const [touchedValidationFields, setTouchedValidationFields] = useState<
     Partial<Record<SettingsValidationField, true>>
   >({});
@@ -72,6 +94,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     if (!auth.user) {
       setLoadedSettings(null);
       setFormSettings(null);
+      setBackupMetadata(null);
+      setBackupPreferencesState(null);
       setSaveError(null);
       setLoadState('missing');
       return;
@@ -79,10 +103,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     setLoadState('loading');
     try {
-      const user = await getUser(auth.user.uid);
+      const [user, metadata, preferences] = await Promise.all([
+        getUser(auth.user.uid),
+        getBackupMetadata(),
+        getBackupPreferences(),
+      ]);
       if (user === null) {
         setLoadedSettings(null);
         setFormSettings(null);
+        setBackupMetadata(null);
+        setBackupPreferencesState(null);
         setSaveError(null);
         setLoadState('missing');
         return;
@@ -92,11 +122,18 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       setFormSettings(nextSettings);
       setHasManualMacroEdits(false);
       setTouchedValidationFields({});
+      setBackupMetadata(metadata);
+      setBackupPreferencesState(preferences);
+      setBackupProgress(null);
+      setBackupStatusMessage(null);
+      setBackupErrorMessage(null);
       setSaveError(null);
       setLoadState('ready');
     } catch {
       setLoadedSettings(null);
       setFormSettings(null);
+      setBackupMetadata(null);
+      setBackupPreferencesState(null);
       setSaveError(null);
       setLoadState('error');
     }
@@ -246,6 +283,50 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     );
   }, [isDirty, isSigningOut, signOut]);
 
+  const createBackup = useCallback(async () => {
+    if (isBackingUp) return;
+
+    setIsBackingUp(true);
+    setBackupProgress(null);
+    setBackupStatusMessage(null);
+    setBackupErrorMessage(null);
+
+    try {
+      const result = await runManualBackup({
+        onProgress: setBackupProgress,
+      });
+
+      if (result.status === 'success') {
+        setBackupMetadata(result.metadata);
+        setBackupStatusMessage(
+          `Backup complete. ${formatBytes(result.metadata.last_backup_size_bytes)} saved.`,
+        );
+      } else {
+        setBackupErrorMessage(mapBackupFailureMessage(result));
+      }
+    } catch {
+      setBackupErrorMessage('Backup failed. Try again.');
+    } finally {
+      setIsBackingUp(false);
+    }
+  }, [isBackingUp]);
+
+  const updateBackupPreferences = useCallback(
+    async (preferences: BackupPreferences) => {
+      setBackupPreferencesState(preferences);
+      setBackupStatusMessage(null);
+      setBackupErrorMessage(null);
+      try {
+        await setBackupPreferences(preferences);
+        await syncPeriodicBackupSchedule();
+      } catch {
+        setBackupErrorMessage('Backup preferences could not be saved.');
+        void loadSettings();
+      }
+    },
+    [loadSettings],
+  );
+
   const saveDisabled = !isDirty || formSettings === null || isSaving || isSigningOut;
 
   return (
@@ -307,6 +388,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       ) : formSettings !== null ? (
         <SettingsForm
           authIdentity={formatAuthIdentity(auth.user)}
+          backupSection={(
+            <SettingsBackupSection
+              errorMessage={backupErrorMessage}
+              isBackingUp={isBackingUp}
+              isDarkMode={isDarkMode}
+              metadata={backupMetadata}
+              onCreateBackup={createBackup}
+              onUpdateBackupPreferences={updateBackupPreferences}
+              preferences={backupPreferences}
+              progress={backupProgress}
+              statusMessage={backupStatusMessage}
+            />
+          )}
           errors={visibleValidationErrors}
           form={formSettings}
           isDarkMode={isDarkMode}
@@ -382,115 +476,19 @@ function formatAuthIdentity(user: ReturnType<typeof useAuth>['user']): string {
   return user?.uid ?? 'Unavailable';
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  containerDark: {
-    backgroundColor: '#000000',
-  },
-  header: {
-    minHeight: 56,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
-  },
-  backButton: {
-    minWidth: 64,
-    paddingVertical: 8,
-  },
-  backText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  backTextDark: {
-    color: '#64A9FF',
-  },
-  titleGroup: {
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  titleDark: {
-    color: '#FFFFFF',
-  },
-  dirtyText: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  dirtyTextDark: {
-    color: '#B0B0B0',
-  },
-  saveButton: {
-    minWidth: 64,
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  saveButtonDisabled: {
-    opacity: 0.4,
-  },
-  saveButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  saveError: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    fontSize: 14,
-    color: '#FF3B30',
-    textAlign: 'center',
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stateMessage: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stateTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  stateTitleDark: {
-    color: '#FFFFFF',
-  },
-  stateBody: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-  },
-  stateBodyDark: {
-    color: '#B0B0B0',
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
+function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: 'error' }>): string {
+  switch (result.code) {
+    case 'no_internet':
+      return 'No internet connection. Connect and try again.';
+    case 'reauth_required':
+      return 'Google Drive access expired. Sign in with Google again.';
+    case 'quota_exceeded':
+      return 'Backup storage is full. Delete old Drive app data or try later.';
+    case 'interrupted_upload':
+      return 'Backup upload was interrupted. Try again.';
+    case 'unsupported_platform':
+      return 'Backup is coming soon on this platform.';
+    case 'backup_failed':
+      return 'Backup storage is inaccessible. Try again.';
+  }
+}

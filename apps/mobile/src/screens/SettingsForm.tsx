@@ -19,6 +19,7 @@ export type SettingsTextFieldKey = Exclude<
 
 interface SettingsFormProps {
   authIdentity: string;
+  backupSection: React.ReactNode;
   errors: SettingsValidationErrors;
   form: SettingsFormState;
   isDarkMode: boolean;
@@ -34,6 +35,7 @@ interface SettingsFormProps {
 
 export default function SettingsForm({
   authIdentity,
+  backupSection,
   errors,
   form,
   isDarkMode,
@@ -166,13 +168,7 @@ export default function SettingsForm({
         />
       </SettingsSection>
 
-      <SettingsSection title="Backup" isDarkMode={isDarkMode}>
-        <ReadOnlyRow
-          label="Backup and restore"
-          value="Backup entry points will be added with backup and restore."
-          isDarkMode={isDarkMode}
-        />
-      </SettingsSection>
+      {backupSection}
 
       <SettingsSection title="Account" isDarkMode={isDarkMode}>
         <ReadOnlyRow label="Signed in as" value={authIdentity} isDarkMode={isDarkMode} />

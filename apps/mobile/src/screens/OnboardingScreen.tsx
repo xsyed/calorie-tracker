@@ -13,6 +13,7 @@ import { useRoute } from '@react-navigation/native';
 
 import { useAuth } from '../auth';
 import { insertUser } from '../database';
+import type { RootStackParamList } from '../navigation/types';
 import { useOnboardingForm } from '../onboarding';
 import type { SafetyGateResult } from '../onboarding';
 import {
@@ -27,12 +28,12 @@ import {
   WeightStep,
 } from '../onboarding/steps';
 import { sharedStyles as s } from '../onboarding/steps/sharedStyles';
+import RestorePrompt from './RestorePrompt';
 
 export default function OnboardingScreen() {
   const auth = useAuth();
   const route = useRoute();
-  const params =
-    (route.params as { onOnboardingComplete?: () => void } | undefined) ?? {};
+  const params = (route.params as RootStackParamList['Onboarding']) ?? {};
   const isDarkMode = useColorScheme() === 'dark';
 
   const {
@@ -53,6 +54,12 @@ export default function OnboardingScreen() {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [skipRestorePrompt, setSkipRestorePrompt] = useState(false);
+
+  const startFresh = useCallback(() => {
+    setSkipRestorePrompt(true);
+    params.onRestoreSkipped?.();
+  }, [params]);
 
   const handleConfirm = useCallback(async () => {
     if (!calculationResults || !auth.user) return;
@@ -174,6 +181,25 @@ export default function OnboardingScreen() {
     }
   };
 
+  if (
+    auth.user !== null &&
+    params.latestRestoreBackup !== undefined &&
+    params.restoreCandidates !== undefined &&
+    !skipRestorePrompt
+  ) {
+    return (
+      <RestorePrompt
+        candidates={params.restoreCandidates}
+        firebaseUid={auth.user.uid}
+        isDarkMode={isDarkMode}
+        isGoogleProvider={hasGoogleProvider(auth.user)}
+        latestBackup={params.latestRestoreBackup}
+        onRestoreComplete={() => params.onRestoreComplete?.()}
+        onStartFresh={startFresh}
+      />
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDarkMode && styles.containerDark]}
@@ -290,3 +316,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+function hasGoogleProvider(user: NonNullable<ReturnType<typeof useAuth>['user']>): boolean {
+  return user.providerData.some((provider) => provider.providerId === 'google.com');
+}

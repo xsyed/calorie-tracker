@@ -1,5 +1,65 @@
 export { useConnectivity, checkConnectivity } from './connectivity';
+export { PeriodicBackupTriggers } from './PeriodicBackupTriggers';
 export { parseFoodText } from './llmService';
+export {
+  cleanupDatabaseBackupFile,
+  createRestoreDownloadFilePath,
+  createDatabaseBackupFile,
+  DatabaseBackupFileError,
+  prepareRestoreCandidateFile,
+  replaceDatabaseWithCandidate,
+  withDatabaseBackupFile,
+} from './databaseBackupFileService';
+export type {
+  PrepareRestoreCandidateOptions,
+  RestoreCandidateFile,
+  StagedDatabaseBackupFile,
+} from './databaseBackupFileService';
+export {
+  deleteGoogleDriveBackup,
+  downloadGoogleDriveBackup,
+  DRIVE_APPDATA_SCOPE,
+  GoogleDriveBackupError,
+  GoogleDriveQuotaExceededError,
+  GoogleDriveReauthRequiredError,
+  GoogleDriveUnavailableError,
+  listGoogleDriveBackups,
+  uploadGoogleDriveBackup,
+  verifyGoogleDriveBackupAccess,
+} from './googleDriveBackupClient';
+export type {
+  DriveBackupFile,
+  GoogleDriveBackupErrorCode,
+  UploadBackupProgress,
+} from './googleDriveBackupClient';
+export { runManualBackup } from './manualBackupService';
+export type {
+  ManualBackupErrorCode,
+  ManualBackupFailure,
+  ManualBackupProgress,
+  ManualBackupResult,
+  ManualBackupStep,
+  ManualBackupSuccess,
+  RunManualBackupOptions,
+} from './manualBackupService';
+export {
+  detectRestoreBackups,
+  restoreBackupForUser,
+} from './restoreService';
+export {
+  isPeriodicBackupDue,
+  runPeriodicBackupIfDue,
+  syncPeriodicBackupSchedule,
+} from './periodicBackupService';
+export type { PeriodicBackupResult } from './periodicBackupService';
+export type {
+  DetectRestoreBackupsResult,
+  RestoreBackupCandidate,
+  RestoreBackupFailure,
+  RestoreBackupResult,
+  RestoreBackupSuccess,
+  RestoreErrorCode,
+} from './restoreService';
 export type {
   ParsedFood,
   ParsedExercise,

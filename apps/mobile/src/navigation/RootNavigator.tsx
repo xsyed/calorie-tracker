@@ -12,6 +12,11 @@ import SettingsScreen from '../screens/SettingsScreen';
 import SplashScreen from '../screens/SplashScreen';
 import WaterScreen from '../screens/WaterScreen';
 import WeightScreen from '../screens/WeightScreen';
+import {
+  detectRestoreBackups,
+  PeriodicBackupTriggers,
+  type RestoreBackupCandidate,
+} from '../services';
 import { FlushTriggers } from '../services/FlushTriggers';
 import type { RootStackParamList, RootTabParamList } from './types';
 
@@ -79,6 +84,9 @@ export default function RootNavigator() {
     'pending' | 'exists' | 'not-exists'
   >('pending');
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [restoreCandidates, setRestoreCandidates] = useState<
+    RestoreBackupCandidate[] | null
+  >(null);
   const [appJustLaunched, setAppJustLaunched] = useState(true);
   const prevStatus = useRef(auth.status);
 
@@ -101,17 +109,35 @@ export default function RootNavigator() {
   }, [auth.status, appJustLaunched, auth.getIdToken, auth.signOut]);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (auth.status === 'authenticated' && auth.user) {
+      setUserCheckState('pending');
+      setRestoreCandidates(null);
       userExists(auth.user.uid)
-        .then((exists) => {
-          setUserCheckState(exists ? 'exists' : 'not-exists');
+        .then(async (exists) => {
+          if (cancelled) return;
+          if (exists) {
+            setUserCheckState('exists');
+            return;
+          }
+          const result = await detectRestoreBackups();
+          if (cancelled) return;
+          setRestoreCandidates(result.candidates.length > 0 ? result.candidates : null);
+          setUserCheckState('not-exists');
         })
         .catch(() => {
+          if (cancelled) return;
           setUserCheckState('not-exists');
         });
     } else {
       setUserCheckState('pending');
+      setRestoreCandidates(null);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [auth.status, auth.user?.uid]);
 
   useEffect(() => {
@@ -126,7 +152,25 @@ export default function RootNavigator() {
 
   const handleOnboardingComplete = useCallback(() => {
     setUserCheckState('exists');
+    setRestoreCandidates(null);
   }, []);
+
+  const handleRestoreSkipped = useCallback(() => {
+    setRestoreCandidates(null);
+  }, []);
+
+  const latestRestoreBackup = restoreCandidates?.[0];
+  const onboardingParams = {
+    onOnboardingComplete: handleOnboardingComplete,
+    onRestoreComplete: handleOnboardingComplete,
+    onRestoreSkipped: handleRestoreSkipped,
+    ...(restoreCandidates === null || latestRestoreBackup === undefined
+      ? {}
+      : {
+          latestRestoreBackup,
+          restoreCandidates,
+        }),
+  };
 
   const showSplash =
     auth.status === 'checking' ||
@@ -155,11 +199,16 @@ export default function RootNavigator() {
           <Stack.Screen
             name="Onboarding"
             component={OnboardingScreen}
-            initialParams={{ onOnboardingComplete: handleOnboardingComplete }}
+            initialParams={onboardingParams}
           />
         )}
       </Stack.Navigator>
-      {userCheckState === 'exists' && <FlushTriggers />}
+      {userCheckState === 'exists' && (
+        <>
+          <FlushTriggers />
+          <PeriodicBackupTriggers />
+        </>
+      )}
     </>
   );
 }
