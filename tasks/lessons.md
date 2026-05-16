@@ -1,1 +1,1 @@
-No active lessons.
+- RN monorepo Android release APK: inspect `apps/mobile/android/app/build.gradle` before giving build command; `react.root` must be mobile app root and `entryFile` actual mobile entry, while `reactNativeDir`/`codegenDir` can still point workspace `node_modules`.
