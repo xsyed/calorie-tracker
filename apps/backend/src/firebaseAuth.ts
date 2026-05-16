@@ -7,9 +7,24 @@ import { type BackendConfig } from "./config.js";
 import { getErrorContext, logError } from "./logger.js";
 
 interface FirebaseServiceAccount {
+  readonly projectId: string | undefined;
+  readonly clientEmail: string | undefined;
+  readonly privateKey: string | undefined;
+}
+
+interface FirebaseServiceAccountJson {
+  readonly project_id?: string;
+  readonly client_email?: string;
+  readonly private_key?: string;
   readonly projectId?: string;
   readonly clientEmail?: string;
   readonly privateKey?: string;
+}
+
+interface CompleteFirebaseServiceAccount {
+  readonly projectId: string;
+  readonly clientEmail: string;
+  readonly privateKey: string;
 }
 
 export interface FirebaseAuthVerifier {
@@ -49,29 +64,34 @@ function getFirebaseApp(config: BackendConfig): App {
 
   const serviceAccount = parseServiceAccount(config.firebaseServiceAccount);
   const projectId = serviceAccount.projectId ?? config.firebaseProjectId;
+  const resolvedServiceAccount = {
+    projectId,
+    clientEmail: serviceAccount.clientEmail,
+    privateKey: serviceAccount.privateKey,
+  };
 
-  if (isEmptyServiceAccount(serviceAccount)) {
-    return initializeApp({
-      ...(projectId === undefined ? {} : { projectId }),
-    });
-  }
+  validateServiceAccount(resolvedServiceAccount);
 
   return initializeApp({
     credential: cert({
-      ...(projectId === undefined ? {} : { projectId }),
-      ...(serviceAccount.clientEmail === undefined ? {} : { clientEmail: serviceAccount.clientEmail }),
-      ...(serviceAccount.privateKey === undefined ? {} : { privateKey: serviceAccount.privateKey }),
+      projectId: resolvedServiceAccount.projectId,
+      clientEmail: resolvedServiceAccount.clientEmail,
+      privateKey: resolvedServiceAccount.privateKey,
     }),
-    ...(projectId === undefined ? {} : { projectId }),
+    projectId: resolvedServiceAccount.projectId,
   });
 }
 
 function parseServiceAccount(value: string | undefined): FirebaseServiceAccount {
   if (value === undefined) {
-    return {};
+    return {
+      projectId: undefined,
+      clientEmail: undefined,
+      privateKey: undefined,
+    };
   }
 
-  return JSON.parse(readServiceAccountValue(value)) as FirebaseServiceAccount;
+  return normalizeServiceAccount(JSON.parse(readServiceAccountValue(value)) as FirebaseServiceAccountJson);
 }
 
 function readServiceAccountValue(value: string): string {
@@ -82,8 +102,16 @@ function readServiceAccountValue(value: string): string {
   return readFileSync(value, "utf8");
 }
 
-function isEmptyServiceAccount(value: FirebaseServiceAccount): boolean {
-  return value.projectId === undefined
-    && value.clientEmail === undefined
-    && value.privateKey === undefined;
+function normalizeServiceAccount(value: FirebaseServiceAccountJson): FirebaseServiceAccount {
+  return {
+    projectId: value.projectId ?? value.project_id,
+    clientEmail: value.clientEmail ?? value.client_email,
+    privateKey: value.privateKey ?? value.private_key,
+  };
+}
+
+function validateServiceAccount(value: FirebaseServiceAccount): asserts value is CompleteFirebaseServiceAccount {
+  if (value.projectId === undefined || value.clientEmail === undefined || value.privateKey === undefined) {
+    throw new Error("Firebase service-account credentials are incomplete.");
+  }
 }
