@@ -33,6 +33,7 @@ export {
   getDailyWaterGoal,
   getDailyWaterTotal,
   getWaterEntriesByDate,
+  getWaterEntriesByDateRange,
   getWaterTotalsByDateRange,
   insertWaterEntry,
   setDailyWaterGoal,

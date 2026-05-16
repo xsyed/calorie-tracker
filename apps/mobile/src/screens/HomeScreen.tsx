@@ -268,17 +268,8 @@ export default function HomeScreen() {
     useCallback(() => {
       const uid = userIdRef.current;
       if (uid === null) return;
-      getUser(uid).then((user) => {
-        if (user) {
-          setUserTargets({
-            dailyCalories: user.daily_target_calories ?? null,
-            proteinG: user.protein_g ?? null,
-            carbsG: user.carbs_g ?? null,
-            fatG: user.fat_g ?? null,
-          });
-        }
-      }).catch(() => {});
-    }, [])
+      loadDataForDate(selectedDateRef.current);
+    }, [loadDataForDate])
   );
 
   const handleSubmit = useCallback(

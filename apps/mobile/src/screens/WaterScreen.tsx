@@ -21,59 +21,44 @@ import {
   getDailyWaterGoal,
   getDailyWaterTotal,
   getUser,
-  getWaterEntriesByDate,
+  getWaterEntriesByDateRange,
+  getWaterTotalsByDateRange,
   insertWaterEntry,
+  setDailyWaterGoal,
 } from '../database';
-import type { WaterEntry } from '../database';
 import type { RootStackParamList } from '../navigation/types';
+import { WaterTrendHistory, type WaterHistoryGroup, type WaterTrendDay } from './WaterTrendHistory';
+import {
+  fillTrendDays,
+  formatDateLabel,
+  formatEntryTime,
+  getCustomAmount,
+  getCustomAmountError,
+  getDateWindow,
+  getGoalAmountError,
+  groupEntriesByDate,
+} from './waterScreenUtils';
 
-const MAX_WATER_AMOUNT_ML = 5000;
 const QUICK_ADD_AMOUNTS = [100, 200, 500] as const;
 
 type WaterScreenProps = NativeStackScreenProps<RootStackParamList, 'Water'>;
-
-function formatDateLabel(date: string): string {
-  return new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatEntryTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function getCustomAmount(value: string): number | null {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) return null;
-
-  const amount = Number(trimmed);
-  return Number.isFinite(amount) ? amount : null;
-}
-
-function getCustomAmountError(amount: number | null): string | null {
-  if (amount === null || amount <= 0) return 'Enter an amount greater than 0ml.';
-  if (amount > MAX_WATER_AMOUNT_ML) return 'Maximum water amount is 5000ml.';
-  return null;
-}
 
 export default function WaterScreen({ navigation, route }: WaterScreenProps) {
   const auth = useAuth();
   const isDarkMode = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
-  const [entries, setEntries] = useState<WaterEntry[]>([]);
   const [dailyTotal, setDailyTotal] = useState(0);
   const [waterGoal, setWaterGoal] = useState(0);
+  const [trend, setTrend] = useState<WaterTrendDay[]>([]);
+  const [historyGroups, setHistoryGroups] = useState<WaterHistoryGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [customError, setCustomError] = useState<string | null>(null);
+  const [goalAmount, setGoalAmount] = useState('');
+  const [goalError, setGoalError] = useState<string | null>(null);
+  const [savingGoal, setSavingGoal] = useState(false);
   const [activeAmount, setActiveAmount] = useState<number | 'custom' | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -83,25 +68,33 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
   const accentColor = isDarkMode ? '#0A84FF' : '#007AFF';
 
   const dateLabel = useMemo(() => formatDateLabel(date), [date]);
+  const trendDates = useMemo(() => getDateWindow(date), [date]);
 
   const loadWaterData = useCallback(async (currentUserId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const [nextEntries, nextTotal, nextGoal] = await Promise.all([
-        getWaterEntriesByDate(currentUserId, date),
+      const startDate = trendDates[0];
+      const endDate = trendDates[trendDates.length - 1];
+      if (startDate === undefined || endDate === undefined) return;
+
+      const [nextHistoryEntries, nextTotal, nextGoal, nextTrendTotals] = await Promise.all([
+        getWaterEntriesByDateRange(currentUserId, startDate, endDate),
         getDailyWaterTotal(currentUserId, date),
         getDailyWaterGoal(),
+        getWaterTotalsByDateRange(currentUserId, startDate, endDate),
       ]);
-      setEntries(nextEntries);
       setDailyTotal(nextTotal);
       setWaterGoal(nextGoal);
+      setGoalAmount(String(nextGoal));
+      setTrend(fillTrendDays(trendDates, nextTrendTotals));
+      setHistoryGroups(groupEntriesByDate(nextHistoryEntries));
     } catch {
       setError('Failed to load water. Try again.');
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [date, trendDates]);
 
   useEffect(() => {
     const firebaseUid = auth.user?.uid;
@@ -210,7 +203,34 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
     setCustomError(null);
   }, []);
 
-  const controlsDisabled = activeAmount !== null || deletingId !== null || userId === null;
+  const handleGoalAmountChange = useCallback((value: string) => {
+    setGoalAmount(value);
+    setGoalError(null);
+  }, []);
+
+  const handleSaveGoal = useCallback(async () => {
+    const amount = getCustomAmount(goalAmount);
+    const validationError = getGoalAmountError(amount);
+    if (validationError !== null || amount === null) {
+      setGoalError(validationError ?? 'Enter a goal greater than 0ml.');
+      return;
+    }
+
+    setSavingGoal(true);
+    setGoalError(null);
+    setError(null);
+    try {
+      await setDailyWaterGoal(amount);
+      setWaterGoal(amount);
+      setGoalAmount(String(amount));
+    } catch {
+      setError('Failed to save water goal. Try again.');
+    } finally {
+      setSavingGoal(false);
+    }
+  }, [goalAmount]);
+
+  const controlsDisabled = activeAmount !== null || deletingId !== null || savingGoal || userId === null;
 
   return (
     <KeyboardAvoidingView
@@ -239,6 +259,32 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
             <View style={[styles.track, isDarkMode && styles.trackDark]}>
               <View style={[styles.bar, { width: `${progressWidth}%`, backgroundColor: accentColor }]} />
             </View>
+          </View>
+
+          <View style={[styles.card, isDarkMode && styles.cardDark]}>
+            <View style={styles.goalHeader}>
+              <Text style={[styles.sectionTitle, isDarkMode && styles.titleDark]}>Daily goal</Text>
+              <Text style={[styles.goalValue, isDarkMode && styles.dateDark]}>{waterGoal}ml/day</Text>
+            </View>
+            <View style={styles.customRow}>
+              <TextInput
+                value={goalAmount}
+                onChangeText={handleGoalAmountChange}
+                keyboardType="number-pad"
+                inputMode="numeric"
+                placeholder="Goal ml/day"
+                placeholderTextColor={isDarkMode ? '#777777' : '#888888'}
+                style={[styles.input, isDarkMode && styles.inputDark]}
+              />
+              <Pressable
+                onPress={handleSaveGoal}
+                disabled={controlsDisabled}
+                style={[styles.addButton, { backgroundColor: accentColor }, controlsDisabled && styles.disabled]}
+              >
+                <Text style={styles.addButtonText}>{savingGoal ? 'Saving...' : 'Save'}</Text>
+              </Pressable>
+            </View>
+            {goalError !== null && <Text style={styles.inlineError}>{goalError}</Text>}
           </View>
 
           <View style={[styles.card, isDarkMode && styles.cardDark]}>
@@ -279,32 +325,17 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
             {customError !== null && <Text style={styles.inlineError}>{customError}</Text>}
           </View>
 
-          <View style={[styles.card, isDarkMode && styles.cardDark]}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.titleDark]}>Entries</Text>
-            {entries.length === 0 ? (
-              <Text style={[styles.emptyText, isDarkMode && styles.dateDark]}>No water logged for this date.</Text>
-            ) : (
-              entries.map((entry) => (
-                <View key={entry.id} style={[styles.entryRow, isDarkMode && styles.entryRowDark]}>
-                  <View>
-                    <Text style={[styles.entryAmount, isDarkMode && styles.titleDark]}>{entry.amount_ml}ml</Text>
-                    <Text style={[styles.entryTime, isDarkMode && styles.dateDark]}>
-                      {formatEntryTime(entry.timestamp)}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => confirmDeleteEntry(entry.id)}
-                    disabled={deletingId !== null}
-                    hitSlop={8}
-                  >
-                    <Text style={[styles.deleteText, deletingId !== null && styles.disabled]}>
-                      {deletingId === entry.id ? 'Deleting...' : 'Delete'}
-                    </Text>
-                  </Pressable>
-                </View>
-              ))
-            )}
-          </View>
+          <WaterTrendHistory
+            accentColor={accentColor}
+            goalMl={waterGoal}
+            groups={historyGroups}
+            isDarkMode={isDarkMode}
+            deletingId={deletingId}
+            onDelete={confirmDeleteEntry}
+            onFormatDate={formatDateLabel}
+            onFormatTime={formatEntryTime}
+            trend={trend}
+          />
         </ScrollView>
       )}
 
@@ -387,6 +418,17 @@ const styles = StyleSheet.create({
   bar: {
     height: 10,
     borderRadius: 5,
+  },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  goalValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
   },
   buttonRow: {
     flexDirection: 'row',

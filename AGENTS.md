@@ -10,7 +10,7 @@ Monorepo (npm workspaces): `apps/mobile`, `packages/` (empty).
 - **Navigation:** `@react-navigation/native-stack`. Auth-aware routing: Splash → Login → Onboarding → Home → Water.
 - **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`. No UI library.
 
-No backend, no shared packages, no tests. Home supports food/exercise logging, saved meals/history, and water quick-add. Water has daily logging for selected date. Other features (weight tracking, backend proxy) exist only as specs in `docs/features/`.
+No backend, no shared packages, no tests. Home supports food/exercise logging, saved meals/history, and water quick-add. Water has daily logging for selected date plus a local 7-day trend and grouped history. Other features (weight tracking, backend proxy) exist only as specs in `docs/features/`.
 
 ---
 

@@ -63,6 +63,22 @@ export async function getWaterEntriesByDate(
   return (result.rows as Record<string, unknown>[]).map(mapRowToWaterEntry);
 }
 
+export async function getWaterEntriesByDateRange(
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<WaterEntry[]> {
+  const db = initDatabase();
+  const result = await db.execute(
+    `SELECT *
+     FROM water_entries
+     WHERE user_id = ? AND date BETWEEN ? AND ?
+     ORDER BY date ASC, timestamp ASC`,
+    [userId, startDate, endDate],
+  );
+  return (result.rows as Record<string, unknown>[]).map(mapRowToWaterEntry);
+}
+
 export async function getDailyWaterTotal(
   userId: string,
   date: string,
