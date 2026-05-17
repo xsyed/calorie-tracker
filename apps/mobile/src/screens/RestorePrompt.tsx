@@ -193,8 +193,14 @@ function mapRestoreFailureMessage(
       return 'Backup download failed. Check connection and try again.';
     case 'migration_failed':
       return 'Backup is too old to migrate. Start fresh or try another backup.';
+    case 'network_error':
+      return 'Network failed while downloading the backup. Check connection and try again.';
+    case 'permission_denied':
+      return 'Google Drive appData access is missing. Check Drive API scopes and sign in with Google again.';
+    case 'quota_exceeded':
+      return 'Google Drive AppData quota is exceeded.';
     case 'reauth_required':
-      return 'Google Drive access expired. Sign in with Google again.';
+      return 'Google Drive access expired or drive.appdata was not granted. Sign in with Google again.';
     case 'uid_mismatch':
       return 'Backup belongs to a different account.';
     case 'unsupported_platform':

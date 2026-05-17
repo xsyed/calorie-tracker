@@ -24,6 +24,9 @@ export type RestoreErrorCode =
   | 'checksum_mismatch'
   | 'download_failed'
   | 'migration_failed'
+  | 'network_error'
+  | 'permission_denied'
+  | 'quota_exceeded'
   | 'reauth_required'
   | 'uid_mismatch'
   | 'unsupported_platform'
@@ -147,6 +150,30 @@ function mapDriveRestoreError(err: GoogleDriveBackupError): RestoreBackupFailure
       status: 'error',
       code: 'reauth_required',
       message: 'Google Drive access required. Please sign in again.',
+      nextCandidate: null,
+    };
+  }
+  if (err.code === 'permission_denied') {
+    return {
+      status: 'error',
+      code: 'permission_denied',
+      message: 'Google Drive appData access is not configured or was denied.',
+      nextCandidate: null,
+    };
+  }
+  if (err.code === 'quota_exceeded') {
+    return {
+      status: 'error',
+      code: 'quota_exceeded',
+      message: 'Google Drive AppData quota exceeded.',
+      nextCandidate: null,
+    };
+  }
+  if (err.code === 'network_error') {
+    return {
+      status: 'error',
+      code: 'network_error',
+      message: 'Network failed while downloading the backup.',
       nextCandidate: null,
     };
   }

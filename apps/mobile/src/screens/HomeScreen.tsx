@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,11 +24,13 @@ import EntryList from '../components/EntryList';
 import type { EntryListFoodEntry, EntryListExerciseEntry } from '../components/EntryList';
 import HistorySavedMealsOverlay from '../components/HistorySavedMealsOverlay';
 import HomeDateCalendar from '../components/HomeDateCalendar';
+import HomeWeightSummary from '../components/HomeWeightSummary';
 import InputBar from '../components/InputBar';
 import type { InputBarHandle } from '../components/InputBar';
 import SaveMealPrompt from '../components/SaveMealPrompt';
-import WaterQuickAdd, { DEFAULT_WATER_GOAL } from '../components/WaterQuickAdd';
+import WaterQuickAdd, { DEFAULT_WATER_GOAL, QUICK_ADD_AMOUNT_ML } from '../components/WaterQuickAdd';
 import {
+  decrementDailyWaterTotal,
   getUser,
   saveParsedLogEntry,
   insertFoodEntry,
@@ -39,13 +42,14 @@ import {
   getDailyWaterTotal,
   getDailyWaterGoal,
   insertWaterEntry,
+  getWeightEntries,
   getExerciseEntriesByDate,
   getDailyExerciseCalories,
   saveFoodEntryAsSavedMeal,
   deleteFoodEntryWithSnapshot,
   restoreDeletedFoodEntry,
 } from '../database';
-import type { DeletedFoodEntrySnapshot } from '../database';
+import type { DeletedFoodEntrySnapshot, WeightEntry } from '../database';
 import type { RootStackParamList } from '../navigation/types';
 import { editFoodEntryWithPrompt, isQueueFlushing, parseFoodText } from '../services';
 import type { EditFoodEntryProgressStep, ParseErrorCode } from '../services';
@@ -54,12 +58,19 @@ type HomeNavigation = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 type HomeRoute = RouteProp<RootStackParamList, 'Home'>;
 
 const DELETE_UNDO_MS = 6000;
+const INPUT_BAR_HEIGHT = 57;
+const KEYBOARD_TOP_CLEARANCE = 44;
 
 interface HomeDailyTotals {
   totalCalories: number;
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+}
+
+interface HomeWeightValues {
+  currentWeightKg: number | null;
+  previousWeightKg: number | null;
 }
 
 function getTodayDate(): string {
@@ -198,6 +209,16 @@ function mapDeletedSnapshotToExerciseEntries(
   }));
 }
 
+function buildHomeWeightValues(
+  entries: WeightEntry[],
+  baselineWeightKg: number | null,
+): HomeWeightValues {
+  return {
+    currentWeightKg: entries[0]?.weight_kg ?? baselineWeightKg,
+    previousWeightKg: entries[1]?.weight_kg ?? (entries.length > 0 ? baselineWeightKg : null),
+  };
+}
+
 export default function HomeScreen() {
   const auth = useAuth();
   const navigation = useNavigation<HomeNavigation>();
@@ -233,6 +254,10 @@ export default function HomeScreen() {
   const [exerciseEntries, setExerciseEntries] = useState<EntryListExerciseEntry[]>([]);
   const [dailyWaterTotal, setDailyWaterTotal] = useState(0);
   const [waterGoal, setWaterGoal] = useState(DEFAULT_WATER_GOAL);
+  const [weightValues, setWeightValues] = useState<HomeWeightValues>({
+    currentWeightKg: null,
+    previousWeightKg: null,
+  });
   const [exerciseCalories, setExerciseCalories] = useState(0);
   const [loggedDates, setLoggedDates] = useState<Set<string>>(new Set());
   const [dataLoading, setDataLoading] = useState(true);
@@ -253,6 +278,7 @@ export default function HomeScreen() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editProgressLabel, setEditProgressLabel] = useState<string | null>(null);
   const [isEditingEntry, setIsEditingEntry] = useState(false);
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
 
   useEffect(() => {
     if (auth.user) {
@@ -286,6 +312,24 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const resetKeyboardBottomInset = useCallback(() => {
+    setKeyboardBottomInset(0);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardBottomInset(Math.max(0, event.endCoordinates.height - insets.bottom));
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', resetKeyboardBottomInset);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom, resetKeyboardBottomInset]);
+
   const loadDataForDate = useCallback(async (date: string) => {
     const uid = userIdRef.current;
     const firebaseUid = firebaseUidRef.current;
@@ -295,7 +339,7 @@ export default function HomeScreen() {
     setDataError(null);
 
     try {
-      const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal, dailyWaterGoal] =
+      const [user, foodEntriesResult, exerciseEntriesResult, exerciseCals, waterTotal, dailyWaterGoal, weightEntries] =
         await Promise.all([
           getUser(firebaseUid),
           getFoodEntriesByDate(uid, date),
@@ -303,6 +347,7 @@ export default function HomeScreen() {
           getDailyExerciseCalories(uid, date),
           getDailyWaterTotal(uid, date),
           getDailyWaterGoal(),
+          getWeightEntries(uid),
         ]);
 
       setUserTargets({
@@ -315,6 +360,7 @@ export default function HomeScreen() {
       setExerciseCalories(exerciseCals);
       setDailyWaterTotal(waterTotal);
       setWaterGoal(dailyWaterGoal);
+      setWeightValues(buildHomeWeightValues(weightEntries, user?.current_weight_kg ?? null));
 
       const entriesWithItems: EntryListFoodEntry[] = [];
       for (const entry of foodEntriesResult) {
@@ -372,10 +418,11 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      resetKeyboardBottomInset();
       const uid = userIdRef.current;
       if (uid === null) return;
       loadDataForDate(selectedDateRef.current);
-    }, [loadDataForDate])
+    }, [loadDataForDate, resetKeyboardBottomInset])
   );
 
   useFocusEffect(
@@ -506,6 +553,24 @@ export default function HomeScreen() {
     }
   }, [selectedDate]);
 
+  const handleRemoveWater = useCallback(async () => {
+    const uid = userIdRef.current;
+    if (uid === null || dailyWaterTotal <= 0) return;
+
+    setAddingWaterAmount(-QUICK_ADD_AMOUNT_ML);
+    setError(null);
+    try {
+      await decrementDailyWaterTotal(uid, selectedDate, QUICK_ADD_AMOUNT_ML);
+      const total = await getDailyWaterTotal(uid, selectedDate);
+      setDailyWaterTotal(total);
+    } catch {
+      setError('Failed to update water. Try again.');
+      throw new Error('Failed to update water');
+    } finally {
+      setAddingWaterAmount(null);
+    }
+  }, [dailyWaterTotal, selectedDate]);
+
   const handleOpenWater = useCallback(() => {
     navigation.navigate('Water', { date: selectedDate });
   }, [navigation, selectedDate]);
@@ -532,8 +597,10 @@ export default function HomeScreen() {
   }, [navigation]);
 
   const handleSettingsPress = useCallback(() => {
+    Keyboard.dismiss();
+    resetKeyboardBottomInset();
     navigation.navigate('Settings');
-  }, [navigation]);
+  }, [navigation, resetKeyboardBottomInset]);
 
   const handleBookmarkPress = useCallback(() => {
     setHistoryOverlayVisible(true);
@@ -801,13 +868,24 @@ export default function HomeScreen() {
     const d = new Date(selectedDate + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }, [selectedDate]);
+  const inputBarBottom = keyboardBottomInset > 0
+    ? keyboardBottomInset + KEYBOARD_TOP_CLEARANCE
+    : 0;
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDarkMode && styles.containerDark]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.content, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.content,
+          {
+            paddingTop: insets.top,
+            paddingBottom: INPUT_BAR_HEIGHT + insets.bottom,
+          },
+        ]}
+      >
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <HomeDateCalendar
@@ -817,18 +895,6 @@ export default function HomeScreen() {
               onVisibleMonthChange={handleVisibleMonthChange}
             />
             <View style={styles.headerActions}>
-              <Pressable
-                accessibilityLabel="Open weight"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={handleWeightPress}
-                style={[styles.headerIconButton, isDarkMode && styles.headerIconButtonDark]}
-              >
-                <View style={[styles.weightGlyphBase, isDarkMode && styles.glyphStrokeDark]}>
-                  <View style={[styles.weightGlyphDial, isDarkMode && styles.glyphStrokeDark]} />
-                  <View style={[styles.weightGlyphNeedle, isDarkMode && styles.glyphFillDark]} />
-                </View>
-              </Pressable>
               <Pressable
                 accessibilityLabel="Open settings"
                 accessibilityRole="button"
@@ -877,13 +943,21 @@ export default function HomeScreen() {
                 dateLabel={dateLabel}
                 hasEntries={hasEntries}
               />
-              <WaterQuickAdd
-                dailyTotal={dailyWaterTotal}
-                waterGoal={waterGoal}
-                onAddWater={handleAddWater}
-                addingAmountMl={addingWaterAmount}
-                onOpenWater={handleOpenWater}
-              />
+              <View style={styles.trackerGrid}>
+                <WaterQuickAdd
+                  dailyTotal={dailyWaterTotal}
+                  waterGoal={waterGoal}
+                  onAddWater={handleAddWater}
+                  onRemoveWater={handleRemoveWater}
+                  addingAmountMl={addingWaterAmount}
+                  onOpenWater={handleOpenWater}
+                />
+                <HomeWeightSummary
+                  currentWeightKg={weightValues.currentWeightKg}
+                  previousWeightKg={weightValues.previousWeightKg}
+                  onLogWeight={handleWeightPress}
+                />
+              </View>
             </View>
             <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer}>
               <EntryList
@@ -923,13 +997,17 @@ export default function HomeScreen() {
         style={[
           styles.inputBarWrapper,
           isDarkMode && styles.inputBarWrapperDark,
-          { paddingBottom: insets.bottom },
+          {
+            paddingBottom: insets.bottom,
+            bottom: inputBarBottom,
+          },
         ]}
       >
         <InputBar
           ref={inputBarRef}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
+          onBlur={resetKeyboardBottomInset}
           onChangeText={handleChangeText}
           onBookmarkPress={handleBookmarkPress}
         />
@@ -1023,9 +1101,6 @@ const styles = StyleSheet.create({
   glyphFillDark: {
     backgroundColor: '#FFFFFF',
   },
-  glyphStrokeDark: {
-    borderColor: '#FFFFFF',
-  },
   settingsGlyph: {
     width: 15,
     height: 15,
@@ -1035,34 +1110,6 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: '#000000',
-  },
-  weightGlyphBase: {
-    width: 18,
-    height: 15,
-    marginTop: 3,
-    borderWidth: 2,
-    borderRadius: 6,
-    borderColor: '#000000',
-    alignItems: 'center',
-  },
-  weightGlyphDial: {
-    position: 'absolute',
-    top: -6,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: '#000000',
-    backgroundColor: 'transparent',
-  },
-  weightGlyphNeedle: {
-    position: 'absolute',
-    top: -1,
-    width: 2,
-    height: 7,
-    borderRadius: 1,
-    backgroundColor: '#000000',
-    transform: [{ rotate: '25deg' }],
   },
   loader: {
     flex: 1,
@@ -1102,6 +1149,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 8,
+    gap: 8,
+  },
+  trackerGrid: {
+    flexDirection: 'row',
     gap: 8,
   },
   scrollContent: {
@@ -1166,6 +1217,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   inputBarWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     backgroundColor: '#FFFFFF',
   },
   inputBarWrapperDark: {

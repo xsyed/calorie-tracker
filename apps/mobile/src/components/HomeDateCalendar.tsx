@@ -242,7 +242,9 @@ export default function HomeDateCalendar({
   const handleMonthPress = (month: MonthItem) => {
     setVisibleMonth(month.id);
     onVisibleMonthChange(month.date);
-    calendarRef.current?.scrollToMonth(month.date);
+    requestAnimationFrame(() => {
+      calendarRef.current?.scrollToMonth(month.date);
+    });
   };
 
   const renderDateItem = ({ item }: { item: DateItem }) => {
@@ -316,7 +318,8 @@ export default function HomeDateCalendar({
           <CalendarList
             ref={calendarRef}
             calendarWidth={calendarWidth}
-            current={`${visibleMonth}-01`}
+            current={selectedDate}
+            animateScroll
             firstDay={0}
             futureScrollRange={0}
             hideArrows

@@ -10,11 +10,13 @@ import {
 } from 'react-native';
 import type { ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth';
 import { deleteWeightEntry, getUser, getWeightEntries, insertWeightEntry } from '../database';
 import type { WeightEntry } from '../database';
+import type { RootStackParamList } from '../navigation/types';
 
 import { getHistoryDelta, WeightHistoryRow } from './WeightHistoryRow';
 import { formatDate, formatSignedWeight, formatWeight } from './weightFormatUtils';
@@ -28,13 +30,17 @@ interface WeightSummary {
   weeklyRateLabel: string | null;
 }
 
+type WeightNavigation = NativeStackNavigationProp<RootStackParamList, 'Weight'>;
+
 const DELETE_UNDO_MS = 6000;
 
 export default function WeightScreen() {
   const auth = useAuth();
+  const navigation = useNavigation<WeightNavigation>();
   const insets = useSafeAreaInsets();
   const isDarkMode = useColorScheme() === 'dark';
   const [userId, setUserId] = useState<string | null>(null);
+  const [baselineWeightKg, setBaselineWeightKg] = useState<number | null>(null);
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +49,7 @@ export default function WeightScreen() {
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const summary = useMemo(() => buildSummary(entries), [entries]);
+  const summary = useMemo(() => buildSummary(entries, baselineWeightKg), [baselineWeightKg, entries]);
 
   useEffect(() => () => {
     if (deleteTimer.current !== null) {
@@ -56,6 +62,7 @@ export default function WeightScreen() {
     if (firebaseUid === undefined) {
       setLoading(false);
       setError('User not found.');
+      setBaselineWeightKg(null);
       return;
     }
 
@@ -68,6 +75,7 @@ export default function WeightScreen() {
           return;
         }
         setUserId(user.id);
+        setBaselineWeightKg(user.current_weight_kg);
       })
       .catch(() => {
         setError('Failed to load weight. Try again.');
@@ -76,19 +84,29 @@ export default function WeightScreen() {
   }, [auth.user?.uid]);
 
   const loadWeightData = useCallback(async () => {
-    if (userId === null) return;
+    const firebaseUid = auth.user?.uid;
+    if (userId === null || firebaseUid === undefined) return;
 
     setLoading(true);
     setError(null);
     try {
-      const loadedEntries = await getWeightEntries(userId);
+      const [user, loadedEntries] = await Promise.all([
+        getUser(firebaseUid),
+        getWeightEntries(userId),
+      ]);
+      if (user === null) {
+        setError('User not found.');
+        setBaselineWeightKg(null);
+        return;
+      }
+      setBaselineWeightKg(user.current_weight_kg);
       setEntries(loadedEntries.filter((entry) => entry.id !== pendingDeletedEntry?.id));
     } catch {
       setError('Failed to load weight. Try again.');
     } finally {
       setLoading(false);
     }
-  }, [pendingDeletedEntry?.id, userId]);
+  }, [auth.user?.uid, pendingDeletedEntry?.id, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -196,8 +214,10 @@ export default function WeightScreen() {
             loading={loading}
             deleteMessage={deleteMessage}
             onLogWeight={() => setLogFormVisible(true)}
+            onNavigateHome={() => navigation.navigate('Home')}
             onRetry={loadWeightData}
             onUndoDelete={handleUndoDelete}
+            baselineWeightKg={baselineWeightKg}
             pendingDeletedEntry={pendingDeletedEntry}
             entries={entries}
             summary={summary}
@@ -216,12 +236,14 @@ export default function WeightScreen() {
 }
 
 interface WeightHeaderProps {
+  baselineWeightKg: number | null;
   deleteMessage: string | null;
   entries: WeightEntry[];
   error: string | null;
   isDarkMode: boolean;
   loading: boolean;
   onLogWeight: () => void;
+  onNavigateHome: () => void;
   onRetry: () => void;
   onUndoDelete: () => void;
   pendingDeletedEntry: WeightEntry | null;
@@ -230,12 +252,14 @@ interface WeightHeaderProps {
 }
 
 function WeightHeader({
+  baselineWeightKg,
   deleteMessage,
   entries,
   error,
   isDarkMode,
   loading,
   onLogWeight,
+  onNavigateHome,
   onRetry,
   onUndoDelete,
   pendingDeletedEntry,
@@ -246,6 +270,16 @@ function WeightHeader({
 
   return (
     <View>
+      <Pressable
+        onPress={onNavigateHome}
+        style={[styles.homeButton, isDarkMode && styles.homeButtonDark]}
+        accessibilityRole="button"
+        accessibilityLabel="Back to Home"
+      >
+        <Text style={[styles.homeButtonText, isDarkMode && styles.homeButtonTextDark]}>
+          Back to Home
+        </Text>
+      </Pressable>
       <View style={styles.titleRow}>
         <View>
           <Text style={[styles.title, isDarkMode && styles.titleDark]}>
@@ -305,7 +339,13 @@ function WeightHeader({
           )}
         </View>
       )}
-      {!loading && error === null && <WeightTrendChart entries={entries} isDarkMode={isDarkMode} />}
+      {!loading && error === null && (
+        <WeightTrendChart
+          entries={entries}
+          baselineWeightKg={baselineWeightKg}
+          isDarkMode={isDarkMode}
+        />
+      )}
       {totalEntries > 0 && (
         <Text style={[styles.historyTitle, isDarkMode && styles.historyTitleDark]}>
           History
@@ -352,23 +392,31 @@ function getStateBlock(
   return null;
 }
 
-function buildSummary(entries: WeightEntry[]): WeightSummary {
+function buildSummary(entries: WeightEntry[], baselineWeightKg: number | null): WeightSummary {
   const currentEntry = entries[0];
   if (currentEntry === undefined) {
+    if (baselineWeightKg !== null) {
+      return {
+        currentLabel: `${formatWeight(baselineWeightKg)} kg`,
+        dateLabel: 'Onboarding baseline',
+        totalChangeLabel: null,
+        weeklyRateLabel: null,
+      };
+    }
     return {
       currentLabel: '--',
-      dateLabel: 'No weigh-ins yet. Onboarding weight stays separate in v1.',
+      dateLabel: 'No weigh-ins yet.',
       totalChangeLabel: null,
       weeklyRateLabel: null,
     };
   }
 
   const firstEntry = entries[entries.length - 1];
-  if (firstEntry === undefined || entries.length === 1) {
+  if (firstEntry === undefined) {
     return {
       currentLabel: `${formatWeight(currentEntry.weight_kg)} kg`,
       dateLabel: formatDate(currentEntry.date),
-      totalChangeLabel: null,
+      totalChangeLabel: getBaselineChangeLabel(currentEntry.weight_kg, baselineWeightKg),
       weeklyRateLabel: null,
     };
   }
@@ -378,11 +426,20 @@ function buildSummary(entries: WeightEntry[]): WeightSummary {
   return {
     currentLabel: `${formatWeight(currentEntry.weight_kg)} kg`,
     dateLabel: formatDate(currentEntry.date),
-    totalChangeLabel: `${formatSignedWeight(totalChange)} since ${formatDate(firstEntry.date)}`,
+    totalChangeLabel: getBaselineChangeLabel(currentEntry.weight_kg, baselineWeightKg),
     weeklyRateLabel: spanDays >= 7
       ? `${formatSignedWeight((totalChange / spanDays) * 7)} per week`
       : null,
   };
+}
+
+function getBaselineChangeLabel(
+  currentWeightKg: number,
+  baselineWeightKg: number | null,
+): string | null {
+  return baselineWeightKg === null
+    ? null
+    : `${formatSignedWeight(currentWeightKg - baselineWeightKg)} since baseline`;
 }
 
 function getUnavailableSummary(): WeightSummary {
@@ -417,6 +474,25 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
+  },
+  homeButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  homeButtonDark: {
+    backgroundColor: '#1C1C1E',
+  },
+  homeButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  homeButtonTextDark: {
+    color: '#FFFFFF',
   },
   titleRow: {
     flexDirection: 'row',

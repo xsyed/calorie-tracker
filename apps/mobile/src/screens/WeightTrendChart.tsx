@@ -12,6 +12,7 @@ const POINT_SIZE = 8;
 const LINE_WIDTH = 2;
 
 interface WeightTrendChartProps {
+  baselineWeightKg: number | null;
   entries: WeightEntry[];
   isDarkMode: boolean;
 }
@@ -29,10 +30,16 @@ interface ChartScale {
   width: number;
 }
 
-export function WeightTrendChart({ entries, isDarkMode }: WeightTrendChartProps) {
+export function WeightTrendChart({ baselineWeightKg, entries, isDarkMode }: WeightTrendChartProps) {
   const [chartWidth, setChartWidth] = useState(0);
   const chartData = useMemo(() => buildWeightChartData(entries), [entries]);
-  const scale = getScale(chartData.displayPoints, chartData.minWeightKg, chartData.maxWeightKg, chartWidth);
+  const bounds = getBoundsWithBaseline(
+    chartData.minWeightKg,
+    chartData.maxWeightKg,
+    baselineWeightKg,
+    chartData.displayPoints.length,
+  );
+  const scale = getScale(chartData.displayPoints, bounds.min, bounds.max, chartWidth);
 
   return (
     <View style={[styles.card, isDarkMode && styles.cardDark]}>
@@ -46,22 +53,36 @@ export function WeightTrendChart({ entries, isDarkMode }: WeightTrendChartProps)
       </View>
 
       {chartData.displayPoints.length === 0 ? (
-        <Text style={[styles.emptyText, isDarkMode && styles.mutedDark]}>
-          No weigh-ins yet. Tap '+ Log Weight' to add your first entry.
-        </Text>
+        <>
+          <Text style={[styles.emptyText, isDarkMode && styles.mutedDark]}>
+            No weigh-ins yet. Tap '+ Log Weight' to add your first entry.
+          </Text>
+          {baselineWeightKg !== null && (
+            <Text style={[styles.baselineText, isDarkMode && styles.mutedDark]}>
+              Baseline: {formatAxisWeight(baselineWeightKg)}
+            </Text>
+          )}
+        </>
       ) : (
         <View>
           <View style={styles.axisRow}>
             <Text style={[styles.axisLabel, isDarkMode && styles.mutedDark]}>
-              {formatAxisWeight(chartData.maxWeightKg)}
+              {formatAxisWeight(bounds.max)}
             </Text>
             <Text style={[styles.axisLabel, isDarkMode && styles.mutedDark]}>
-              {formatAxisWeight(chartData.minWeightKg)}
+              {formatAxisWeight(bounds.min)}
             </Text>
           </View>
           <View style={styles.chart} onLayout={handleLayout(setChartWidth)}>
             {chartWidth > 0 && (
               <>
+                {baselineWeightKg !== null && (
+                  <BaselineLine
+                    color={isDarkMode ? '#8E8E93' : '#8A8A8E'}
+                    scale={scale}
+                    weightKg={baselineWeightKg}
+                  />
+                )}
                 {chartData.segments.map((segment) => (
                   <Segment
                     key={`${segment.start.date}-${segment.end.date}`}
@@ -93,6 +114,11 @@ export function WeightTrendChart({ entries, isDarkMode }: WeightTrendChartProps)
           {chartData.displayPoints.length === 1 && (
             <Text style={[styles.singleText, isDarkMode && styles.mutedDark]}>
               Log another weigh-in to see a trend.
+            </Text>
+          )}
+          {baselineWeightKg !== null && (
+            <Text style={[styles.baselineText, isDarkMode && styles.mutedDark]}>
+              Baseline: {formatAxisWeight(baselineWeightKg)}
             </Text>
           )}
         </View>
@@ -156,6 +182,29 @@ function Point({ color, point, scale }: PointProps) {
   );
 }
 
+interface BaselineLineProps {
+  color: string;
+  scale: ChartScale;
+  weightKg: number;
+}
+
+function BaselineLine({ color, scale, weightKg }: BaselineLineProps) {
+  const y = getWeightPosition(weightKg, scale);
+
+  return (
+    <View
+      style={[
+        styles.baselineLine,
+        {
+          backgroundColor: color,
+          top: y,
+          width: scale.width,
+        },
+      ]}
+    />
+  );
+}
+
 function getScale(points: WeightChartPoint[], minWeight: number, maxWeight: number, width: number): ChartScale {
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
@@ -173,14 +222,34 @@ function getScale(points: WeightChartPoint[], minWeight: number, maxWeight: numb
 
 function getPosition(point: WeightChartPoint, scale: ChartScale): ChartPosition {
   const xRange = scale.maxDay - scale.minDay;
-  const yRange = scale.maxWeight - scale.minWeight;
   const x = ((point.dayIndex - scale.minDay) / xRange) * scale.width;
-  const y = CHART_HEIGHT - ((point.weightKg - scale.minWeight) / yRange) * CHART_HEIGHT;
+  const y = getWeightPosition(point.weightKg, scale);
 
   return {
     x: Math.max(0, Math.min(scale.width, x)),
     y: Math.max(0, Math.min(CHART_HEIGHT, y)),
   };
+}
+
+function getWeightPosition(weightKg: number, scale: ChartScale): number {
+  const yRange = scale.maxWeight - scale.minWeight;
+  return CHART_HEIGHT - ((weightKg - scale.minWeight) / yRange) * CHART_HEIGHT;
+}
+
+function getBoundsWithBaseline(
+  minWeight: number,
+  maxWeight: number,
+  baselineWeightKg: number | null,
+  displayPointCount: number,
+): { max: number; min: number } {
+  if (baselineWeightKg === null || displayPointCount === 0) {
+    return { max: maxWeight, min: minWeight };
+  }
+
+  const min = Math.min(minWeight, baselineWeightKg);
+  const max = Math.max(maxWeight, baselineWeightKg);
+  if (min === max) return { max: max + 1, min: min - 1 };
+  return { max, min };
 }
 
 function handleLayout(setChartWidth: (width: number) => void) {
@@ -245,6 +314,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666666',
   },
+  baselineText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#666666',
+  },
   axisRow: {
     position: 'absolute',
     top: 10,
@@ -268,6 +342,11 @@ const styles = StyleSheet.create({
     height: LINE_WIDTH,
     opacity: 0.75,
     transformOrigin: 'left center',
+  },
+  baselineLine: {
+    position: 'absolute',
+    height: 1,
+    opacity: 0.5,
   },
   trendLine: {
     opacity: 0.45,

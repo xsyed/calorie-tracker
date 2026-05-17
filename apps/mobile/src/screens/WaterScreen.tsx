@@ -38,6 +38,7 @@ import {
   getGoalAmountError,
   groupEntriesByDate,
 } from './waterScreenUtils';
+import { formatWaterAmount } from '../waterFormat';
 
 const QUICK_ADD_AMOUNTS = [100, 200, 500] as const;
 
@@ -254,7 +255,7 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
           <View style={[styles.card, isDarkMode && styles.cardDark]}>
             <Text style={[styles.sectionTitle, isDarkMode && styles.titleDark]}>Daily progress</Text>
             <Text style={[styles.progressText, isDarkMode && styles.titleDark]}>
-              {dailyTotal}ml / {waterGoal}ml ({progressPercent}%)
+              {formatWaterAmount(dailyTotal)} / {formatWaterAmount(waterGoal)} ({progressPercent}%)
             </Text>
             <View style={[styles.track, isDarkMode && styles.trackDark]}>
               <View style={[styles.bar, { width: `${progressWidth}%`, backgroundColor: accentColor }]} />
@@ -264,7 +265,9 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
           <View style={[styles.card, isDarkMode && styles.cardDark]}>
             <View style={styles.goalHeader}>
               <Text style={[styles.sectionTitle, isDarkMode && styles.titleDark]}>Daily goal</Text>
-              <Text style={[styles.goalValue, isDarkMode && styles.dateDark]}>{waterGoal}ml/day</Text>
+              <Text style={[styles.goalValue, isDarkMode && styles.dateDark]}>
+                {formatWaterAmount(waterGoal)}/day
+              </Text>
             </View>
             <View style={styles.customRow}>
               <TextInput
@@ -298,7 +301,7 @@ export default function WaterScreen({ navigation, route }: WaterScreenProps) {
                   style={[styles.pillButton, { borderColor: accentColor }, controlsDisabled && styles.disabled]}
                 >
                   <Text style={[styles.pillButtonText, { color: accentColor }]}>
-                    {activeAmount === amount ? 'Adding...' : `+${amount}ml`}
+                    {activeAmount === amount ? 'Adding...' : `+${formatWaterAmount(amount)}`}
                   </Text>
                 </Pressable>
               ))}

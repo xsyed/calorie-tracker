@@ -17,6 +17,7 @@ export interface InputBarHandle {
 interface InputBarProps {
   onSubmit: (text: string) => Promise<void>;
   isSubmitting: boolean;
+  onBlur?: () => void;
   onChangeText?: (text: string) => void;
   onBookmarkPress?: () => void;
 }
@@ -24,6 +25,7 @@ interface InputBarProps {
 export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
   onSubmit,
   isSubmitting,
+  onBlur,
   onChangeText,
   onBookmarkPress,
 }, ref) {
@@ -98,6 +100,7 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
         onChangeText={handleChangeText}
         editable={!isSubmitting}
         returnKeyType="send"
+        onBlur={onBlur}
         onSubmitEditing={handleSubmitEditing}
         blurOnSubmit={false}
       />

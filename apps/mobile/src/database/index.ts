@@ -44,6 +44,7 @@ export {
 export { getSetting, setSetting } from './appSettingsRepository';
 export {
   DEFAULT_DAILY_WATER_GOAL_ML,
+  decrementDailyWaterTotal,
   deleteWaterEntry,
   getDailyWaterGoal,
   getDailyWaterTotal,

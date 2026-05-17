@@ -141,7 +141,7 @@ export default function EntryList({
             onOpenEntryActions,
           );
         }
-        return renderExerciseEntry(item.entry, isDark);
+        return renderExerciseEntry(item.entry, isDark, onOpenEntryActions);
       })}
     </View>
   );
@@ -248,16 +248,26 @@ function formatNumber(value: number): string {
 function renderExerciseEntry(
   entry: EntryListExerciseEntry,
   isDark: boolean,
+  onOpenEntryActions: (entryId: string) => void,
 ) {
-  return (
+  const content = (
     <View key={`exercise-${entry.id}`} style={[styles.card, isDark && styles.cardDark]}>
       <Text style={[styles.entryTitle, isDark && styles.entryTitleDark]}>
-        {entry.durationMinutes} min {entry.type} — {entry.caloriesBurned} kcal
+        {entry.durationMinutes} min {entry.type} - {entry.caloriesBurned} kcal
       </Text>
       <Text style={[styles.subtext, isDark && styles.subtextDark]}>
         {formatTime(entry.timestamp)}
       </Text>
     </View>
+  );
+
+  const foodEntryId = entry.foodEntryId;
+  if (foodEntryId === null) return content;
+
+  return (
+    <Pressable key={`exercise-${entry.id}`} onPress={() => onOpenEntryActions(foodEntryId)}>
+      {content}
+    </Pressable>
   );
 }
 

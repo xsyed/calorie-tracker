@@ -51,6 +51,45 @@ export async function deleteWaterEntry(
   ]);
 }
 
+export async function decrementDailyWaterTotal(
+  userId: string,
+  date: string,
+  amountMl: number,
+): Promise<void> {
+  if (amountMl <= 0) return;
+
+  const db = initDatabase();
+  const result = await db.execute(
+    `SELECT id, amount_ml
+     FROM water_entries
+     WHERE user_id = ? AND date = ? AND amount_ml > 0
+     ORDER BY timestamp DESC`,
+    [userId, date],
+  );
+  let remainingAmount = amountMl;
+
+  for (const row of result.rows as Record<string, unknown>[]) {
+    if (remainingAmount <= 0) return;
+
+    const id = row.id as string;
+    const amount = row.amount_ml as number;
+    if (amount <= remainingAmount) {
+      await db.execute('DELETE FROM water_entries WHERE id = ? AND user_id = ?', [
+        id,
+        userId,
+      ]);
+      remainingAmount -= amount;
+      continue;
+    }
+
+    await db.execute(
+      'UPDATE water_entries SET amount_ml = ? WHERE id = ? AND user_id = ?',
+      [amount - remainingAmount, id, userId],
+    );
+    return;
+  }
+}
+
 export async function getWaterEntriesByDate(
   userId: string,
   date: string,

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { WaterEntry } from '../database';
+import { formatWaterAmount } from '../waterFormat';
 
 export interface WaterTrendDay {
   date: string;
@@ -55,7 +56,9 @@ export function WaterTrendHistory({
       <View style={[styles.card, isDarkMode && styles.cardDark]}>
         <View style={styles.titleRow}>
           <Text style={[styles.sectionTitle, isDarkMode && styles.titleDark]}>7-day trend</Text>
-          <Text style={[styles.goalText, isDarkMode && styles.mutedText]}>Goal {goalMl}ml</Text>
+          <Text style={[styles.goalText, isDarkMode && styles.mutedText]}>
+            Goal {formatWaterAmount(goalMl)}
+          </Text>
         </View>
         <View style={styles.chart}>
           <View style={[styles.goalLine, { top: goalOffset }]} />
@@ -73,7 +76,9 @@ export function WaterTrendHistory({
                 />
               </View>
               <Text style={[styles.dayLabel, isDarkMode && styles.mutedText]}>{formatShortDay(day.date)}</Text>
-              <Text style={[styles.amountLabel, isDarkMode && styles.mutedText]}>{day.total_ml}ml</Text>
+              <Text style={[styles.amountLabel, isDarkMode && styles.mutedText]}>
+                {formatWaterAmount(day.total_ml)}
+              </Text>
             </View>
           ))}
         </View>
@@ -88,7 +93,9 @@ export function WaterTrendHistory({
               {group.entries.map((entry) => (
                 <View key={entry.id} style={[styles.entryRow, isDarkMode && styles.entryRowDark]}>
                   <View>
-                    <Text style={[styles.entryAmount, isDarkMode && styles.titleDark]}>{entry.amount_ml}ml</Text>
+                    <Text style={[styles.entryAmount, isDarkMode && styles.titleDark]}>
+                      {formatWaterAmount(entry.amount_ml)}
+                    </Text>
                     <Text style={[styles.entryTime, isDarkMode && styles.mutedText]}>
                       {onFormatTime(entry.timestamp)}
                     </Text>

@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -9,7 +10,8 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth';
 import { insertUser } from '../database';
@@ -28,13 +30,16 @@ import {
   WeightStep,
 } from '../onboarding/steps';
 import { sharedStyles as s } from '../onboarding/steps/sharedStyles';
-import RestorePrompt from './RestorePrompt';
+
+const NAV_HEIGHT = 93;
+const KEYBOARD_TOP_CLEARANCE = 44;
 
 export default function OnboardingScreen() {
   const auth = useAuth();
   const route = useRoute();
   const params = (route.params as RootStackParamList['Onboarding']) ?? {};
   const isDarkMode = useColorScheme() === 'dark';
+  const insets = useSafeAreaInsets();
 
   const {
     step,
@@ -54,13 +59,33 @@ export default function OnboardingScreen() {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [skipRestorePrompt, setSkipRestorePrompt] = useState(false);
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const showStepNavigation = step !== 'safety_gate' && step !== 'summary';
+  const navBottom = keyboardBottomInset > 0 ? keyboardBottomInset + KEYBOARD_TOP_CLEARANCE : 0;
 
-  const startFresh = useCallback(() => {
-    setSkipRestorePrompt(true);
-    params.onRestoreSkipped?.();
-  }, [params]);
+  const resetKeyboardBottomInset = useCallback(() => {
+    setKeyboardBottomInset(0);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardBottomInset(Math.max(0, event.endCoordinates.height - insets.bottom));
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', resetKeyboardBottomInset);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom, resetKeyboardBottomInset]);
+
+  useFocusEffect(
+    useCallback(() => {
+      resetKeyboardBottomInset();
+    }, [resetKeyboardBottomInset]),
+  );
 
   const handleConfirm = useCallback(async () => {
     if (!calculationResults || !auth.user) return;
@@ -182,32 +207,16 @@ export default function OnboardingScreen() {
     }
   };
 
-  if (
-    auth.user !== null &&
-    params.latestRestoreBackup !== undefined &&
-    params.restoreCandidates !== undefined &&
-    !skipRestorePrompt
-  ) {
-    return (
-      <RestorePrompt
-        candidates={params.restoreCandidates}
-        firebaseUid={auth.user.uid}
-        isDarkMode={isDarkMode}
-        isGoogleProvider={hasGoogleProvider(auth.user)}
-        latestBackup={params.latestRestoreBackup}
-        onRestoreComplete={() => params.onRestoreComplete?.()}
-        onStartFresh={startFresh}
-      />
-    );
-  }
-
   return (
     <KeyboardAvoidingView
       style={[styles.container, isDarkMode && styles.containerDark]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          showStepNavigation && { paddingBottom: NAV_HEIGHT + insets.bottom },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.inner}>
@@ -224,7 +233,16 @@ export default function OnboardingScreen() {
         </View>
       </ScrollView>
       {showStepNavigation && (
-        <View style={[styles.navWrapper, isDarkMode && styles.navWrapperDark]}>
+        <View
+          style={[
+            styles.navWrapper,
+            isDarkMode && styles.navWrapperDark,
+            {
+              bottom: navBottom,
+              paddingBottom: 24 + insets.bottom,
+            },
+          ]}
+        >
           <View style={styles.navRow}>
             {step !== 'gender' ? (
               <Pressable
@@ -310,6 +328,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   navWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 24,
@@ -328,7 +349,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-function hasGoogleProvider(user: NonNullable<ReturnType<typeof useAuth>['user']>): boolean {
-  return user.providerData.some((provider) => provider.providerId === 'google.com');
-}

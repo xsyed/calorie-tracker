@@ -7,13 +7,16 @@ import {
   View,
 } from 'react-native';
 
+import { formatWaterAmount } from '../waterFormat';
+
 export const DEFAULT_WATER_GOAL = 2000;
-const QUICK_ADD_AMOUNT_ML = 250;
+export const QUICK_ADD_AMOUNT_ML = 250;
 
 interface WaterQuickAddProps {
   dailyTotal: number;
   waterGoal: number;
   onAddWater: (amountMl: number) => Promise<void>;
+  onRemoveWater: () => Promise<void>;
   addingAmountMl: number | null;
   onOpenWater: () => void;
 }
@@ -22,6 +25,7 @@ export default function WaterQuickAdd({
   dailyTotal,
   waterGoal,
   onAddWater,
+  onRemoveWater,
   addingAmountMl,
   onOpenWater,
 }: WaterQuickAddProps) {
@@ -36,6 +40,7 @@ export default function WaterQuickAdd({
 
   const accentColor = isDarkMode ? '#0A84FF' : '#007AFF';
   const buttonsDisabled = addingAmountMl !== null;
+  const removeDisabled = buttonsDisabled || dailyTotal <= 0;
 
   async function handleQuickAdd(amountMl: number) {
     if (debounceRef.current || addingAmountMl !== null) return;
@@ -43,6 +48,21 @@ export default function WaterQuickAdd({
     debounceRef.current = true;
     try {
       await onAddWater(amountMl);
+    } catch {
+      return;
+    } finally {
+      setTimeout(() => {
+        debounceRef.current = false;
+      }, 500);
+    }
+  }
+
+  async function handleQuickRemove() {
+    if (debounceRef.current || removeDisabled) return;
+
+    debounceRef.current = true;
+    try {
+      await onRemoveWater();
     } catch {
       return;
     } finally {
@@ -62,9 +82,16 @@ export default function WaterQuickAdd({
       </View>
 
       <View style={styles.controlRow}>
-        <Text style={[styles.controlButton, styles.controlButtonDisabled]}>-</Text>
+        <Pressable
+          onPress={handleQuickRemove}
+          disabled={removeDisabled}
+          hitSlop={8}
+          style={removeDisabled && styles.controlButtonDisabled}
+        >
+          <Text style={[styles.controlButton, { color: accentColor }]}>-</Text>
+        </Pressable>
         <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]} numberOfLines={1}>
-          {dailyTotal}ml/{effectiveGoal}ml ({percentage}%)
+          {formatWaterAmount(dailyTotal)}/{formatWaterAmount(effectiveGoal)} ({percentage}%)
         </Text>
         <Pressable
           onPress={() => handleQuickAdd(QUICK_ADD_AMOUNT_ML)}
@@ -86,7 +113,7 @@ export default function WaterQuickAdd({
       </View>
 
       <Text style={[styles.incrementLabel, isDarkMode && styles.contextLabelDark]}>
-        {addingAmountMl === QUICK_ADD_AMOUNT_ML ? 'Adding...' : '0.25L each'}
+        {addingAmountMl === null ? '0.25L each' : 'Updating...'}
       </Text>
     </View>
   );
@@ -94,6 +121,8 @@ export default function WaterQuickAdd({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
+    minWidth: 0,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E5EA',
