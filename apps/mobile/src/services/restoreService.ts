@@ -1,4 +1,5 @@
 import { open } from '@op-engineering/op-sqlite';
+import type { Scalar } from '@op-engineering/op-sqlite';
 import auth from '@react-native-firebase/auth';
 import RNFS from 'react-native-fs';
 
@@ -144,6 +145,104 @@ async function verifyCandidateOwner(
   } finally {
     await candidateDb.closeAsync();
   }
+}
+
+async function pruneCandidateToUser(
+  filePath: string,
+  firebaseUid: string,
+): Promise<void> {
+  const { location, name } = splitFilePath(filePath);
+  const candidateDb = open({ location, name });
+
+  try {
+    const userResult = await candidateDb.execute(
+      'SELECT id FROM User WHERE firebase_uid = ? LIMIT 1',
+      [firebaseUid],
+    );
+    const userRow = userResult.rows[0] as Record<string, unknown> | undefined;
+    const userId = typeof userRow?.id === 'string' ? userRow.id : null;
+    if (userId === null) {
+      throw new RestoreFlowError(
+        'uid_mismatch',
+        'Backup belongs to a different account.',
+      );
+    }
+
+    await deleteIfTableExists(
+      candidateDb,
+      'food_items',
+      'DELETE FROM food_items WHERE food_entry_id NOT IN (SELECT id FROM food_entries WHERE user_id = ?)',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'exercise_entries',
+      'DELETE FROM exercise_entries WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'food_entries',
+      'DELETE FROM food_entries WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'saved_meal_items',
+      'DELETE FROM saved_meal_items WHERE saved_meal_id NOT IN (SELECT id FROM saved_meals WHERE user_id = ?)',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'saved_meals',
+      'DELETE FROM saved_meals WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'meal_reminders',
+      'DELETE FROM meal_reminders WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'meal_reminder_settings',
+      'DELETE FROM meal_reminder_settings WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'water_entries',
+      'DELETE FROM water_entries WHERE user_id != ?',
+      [userId],
+    );
+    await deleteIfTableExists(
+      candidateDb,
+      'weight_entries',
+      'DELETE FROM weight_entries WHERE user_id != ?',
+      [userId],
+    );
+    await candidateDb.execute(
+      'DELETE FROM User WHERE firebase_uid != ?',
+      [firebaseUid],
+    );
+  } finally {
+    await candidateDb.closeAsync();
+  }
+}
+
+async function deleteIfTableExists(
+  database: ReturnType<typeof open>,
+  tableName: string,
+  statement: string,
+  parameters: Scalar[],
+): Promise<void> {
+  const result = await database.execute(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+    [tableName],
+  );
+  if (result.rows.length === 0) return;
+  await database.execute(statement, parameters);
 }
 
 async function verifyDownloadedBackupSize(
@@ -324,6 +423,7 @@ export async function restoreBackupForUser(
     });
     candidatePath = restoreFile.filePath;
     await verifyCandidateOwner(candidatePath, firebaseUid);
+    await pruneCandidateToUser(candidatePath, firebaseUid);
     await replaceDatabaseWithCandidate(candidatePath, {
       validateReplacement: async () => {
         try {
