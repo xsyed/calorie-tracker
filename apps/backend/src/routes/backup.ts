@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import busboy from "busboy";
@@ -13,10 +13,11 @@ import { logInfo } from "../logger.js";
 import { requireFirebaseAuth } from "../middleware/auth.js";
 
 const BACKUP_ROOT = "/data/backups";
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 const MAX_BACKUP_COUNT = 5;
 const MANIFEST_FILE = "manifest.json";
 const BACKUP_FILE = "backup.enc";
+const TRAILING_CRLF_BYTES = 2;
 
 function sanitizeBackupId(id: string): string {
   const sanitized = id.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -50,9 +51,11 @@ function parseBackupUpload(req: Request, _res: Response, next: NextFunction): vo
 
   const fileChunks: Buffer[] = [];
   let manifest: string | undefined;
+  let fileTooLarge = false;
   let closed = false;
 
   bb.on("file", (_name: string, stream: NodeJS.ReadableStream, _info: FileInfo) => {
+    stream.on("limit", () => { fileTooLarge = true; });
     stream.on("data", (chunk: Buffer) => { fileChunks.push(chunk); });
     stream.on("error", (err: Error) => {
       if (!closed) {
@@ -73,6 +76,10 @@ function parseBackupUpload(req: Request, _res: Response, next: NextFunction): vo
       next(new HttpError(400, "missing_fields", "File and manifest are required."));
       return;
     }
+    if (fileTooLarge) {
+      next(new HttpError(413, "backup_too_large", "Backup file is too large."));
+      return;
+    }
     req.backupUpload = { file: Buffer.concat(fileChunks), manifest };
     next();
   });
@@ -85,6 +92,17 @@ function parseBackupUpload(req: Request, _res: Response, next: NextFunction): vo
   });
 
   req.pipe(bb);
+}
+
+function stripMultipartTrailingCrlf(file: Buffer, expectedSize: number): Buffer {
+  if (
+    file.length === expectedSize + TRAILING_CRLF_BYTES &&
+    file[file.length - 2] === 13 &&
+    file[file.length - 1] === 10
+  ) {
+    return file.subarray(0, expectedSize);
+  }
+  return file;
 }
 
 async function enforceRetention(uid: string, maxCount: number): Promise<void> {
@@ -139,14 +157,19 @@ export function createBackupRouter(config: BackendConfig): Router {
         return;
       }
 
-      const backups: { id: string; manifest: unknown }[] = [];
+      const backups: { id: string; manifest: unknown; storedSizeBytes: number }[] = [];
       const entries = await readdir(userDir, { withFileTypes: true });
 
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         try {
           const raw = await readFile(join(userDir, entry.name, MANIFEST_FILE), "utf-8");
-          backups.push({ id: entry.name, manifest: JSON.parse(raw) });
+          const backupStats = await stat(join(userDir, entry.name, BACKUP_FILE));
+          backups.push({
+            id: entry.name,
+            manifest: JSON.parse(raw),
+            storedSizeBytes: backupStats.size,
+          });
         } catch {
           // skip corrupted/incomplete backups
         }
@@ -165,11 +188,24 @@ export function createBackupRouter(config: BackendConfig): Router {
       const upload = req.backupUpload;
       if (upload === undefined) return;
 
-      const manifest = JSON.parse(upload.manifest) as { backupId?: string };
+      const manifest = JSON.parse(upload.manifest) as {
+        backupId?: string;
+        encryptedSizeBytes?: number;
+      };
       const rawBackupId = typeof manifest.backupId === "string" ? manifest.backupId : "";
       const backupId = sanitizeBackupId(rawBackupId);
       if (backupId === "") {
         next(new HttpError(400, "invalid_manifest", "Manifest must include backupId."));
+        return;
+      }
+      const backupFile = typeof manifest.encryptedSizeBytes === "number"
+        ? stripMultipartTrailingCrlf(upload.file, manifest.encryptedSizeBytes)
+        : upload.file;
+      if (
+        typeof manifest.encryptedSizeBytes !== "number" ||
+        backupFile.length !== manifest.encryptedSizeBytes
+      ) {
+        next(new HttpError(400, "invalid_manifest", "Manifest encrypted size does not match file."));
         return;
       }
 
@@ -177,7 +213,7 @@ export function createBackupRouter(config: BackendConfig): Router {
       await mkdir(backupDir, { recursive: true });
 
       await Promise.all([
-        writeFile(join(backupDir, BACKUP_FILE), upload.file),
+        writeFile(join(backupDir, BACKUP_FILE), backupFile),
         writeFile(join(backupDir, MANIFEST_FILE), upload.manifest, "utf-8"),
       ]);
 
@@ -187,9 +223,9 @@ export function createBackupRouter(config: BackendConfig): Router {
         // retention is best-effort
       }
 
-      logInfo("backup_uploaded", { uid, backupId, size: upload.file.length });
+      logInfo("backup_uploaded", { uid, backupId, size: backupFile.length });
 
-      res.json({ status: "ok", backupId });
+      res.json({ status: "ok", backupId, storedSizeBytes: backupFile.length });
     } catch (err) {
       next(err);
     }

@@ -3,3 +3,9 @@
 - Home header spacing: compact date strip still needs vertical clearance from absolute weight/settings actions; check overlap, not only height.
 - Pre-onboarding network/provider checks need a timeout/fallback; never let restore detection block onboarding indefinitely.
 - Android keyboard/footer bugs: do not trust margin-bottom inside flex after adjustResize; verify screenshot/hierarchy. Use positioned bottom inset or actual resize, not mixed layout.
+- Backup restore password bugs: do not patch crypto fallback from symptoms only; prove whether failure is key unwrap, downloaded bytes mismatch, manifest mismatch, or content decrypt before declaring fixed.
+- Manual backup password: never let "create backup" silently reuse old wrapped key material; user-entered backup password must wrap that uploaded manifest.
+- Backup restore retries: if user reports same restore failure after a fix, add exact diagnostics for expected/actual encrypted size and decrypted checksum before another theory fix.
+- Backup flow regressions: after backup/restore fixes, audit loading-state finally paths and backend compatibility before returning; old deployed backend response shapes can break new client verification.
+- Restore loading state: any async screen action that sets loading true must wrap awaited work in try/finally; service functions can throw before their own internal catch if validation sits outside try.
+- Backup size diagnostics: stored > expected by exactly 2 bytes is not "incomplete"; handle trailing CRLF as upload artifact and trim before AES-GCM.

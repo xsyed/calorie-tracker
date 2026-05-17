@@ -4,8 +4,10 @@ import RNFS from 'react-native-fs';
 import type { EncryptedBackupManifest } from './backupCrypto';
 
 const API_BASE_URL = 'https://calories-api.fly.dev';
+const TRAILING_CRLF_BYTES = 2;
 
 export type CloudBackupErrorCode =
+  | 'backup_too_large'
   | 'storage_unavailable'
   | 'permission_denied'
   | 'quota_exceeded'
@@ -23,6 +25,7 @@ export interface CloudBackupFile {
   modifiedTime: string;
   name: string;
   sizeBytes: number | null;
+  storedEncryptedSizeBytes: number | null;
 }
 
 export interface UploadBackupProgress {
@@ -79,7 +82,19 @@ function toCloudBackupFile(manifest: EncryptedBackupManifest): CloudBackupFile {
     modifiedTime: manifest.createdTime,
     name: manifest.originalFileName,
     sizeBytes: manifest.originalSizeBytes,
+    storedEncryptedSizeBytes: null,
   };
+}
+
+function toStoredSize(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function hasOnlyTrailingCrlfExtra(
+  actualSize: unknown,
+  expectedSize: number,
+): boolean {
+  return actualSize === expectedSize + TRAILING_CRLF_BYTES;
 }
 
 async function getAuthHeader(forceRefresh = false): Promise<Record<string, string>> {
@@ -95,7 +110,9 @@ function mapHttpError(statusCode: number, body: string): CloudBackupError {
 
   try {
     const parsed = JSON.parse(body) as { error?: string; details?: string };
-    if (parsed.error === 'invalid_token' || parsed.error === 'missing_token') {
+    if (parsed.error === 'backup_too_large') {
+      errorCode = 'backup_too_large';
+    } else if (parsed.error === 'invalid_token' || parsed.error === 'missing_token') {
       errorCode = 'permission_denied';
     } else if (parsed.error === 'not_found') {
       errorCode = 'storage_unavailable';
@@ -114,7 +131,8 @@ function mapHttpError(statusCode: number, body: string): CloudBackupError {
 
   if (statusCode === 401 || statusCode === 403) errorCode = 'permission_denied';
   if (statusCode === 404) errorCode = 'storage_unavailable';
-  if (statusCode === 413 || statusCode === 429) errorCode = 'quota_exceeded';
+  if (statusCode === 413 && errorCode !== 'backup_too_large') errorCode = 'backup_too_large';
+  if (statusCode === 429) errorCode = 'quota_exceeded';
   if (statusCode >= 500) errorCode = 'api_error';
 
   return new CloudBackupError(errorCode, message);
@@ -189,9 +207,27 @@ export async function uploadCloudBackup({
       throw mapHttpError(result.statusCode, result.body);
     }
 
+    const data = JSON.parse(result.body) as {
+      backupId?: unknown;
+      storedSizeBytes?: unknown;
+    };
+    if (data.backupId !== manifest.backupId) {
+      throw new CloudBackupError('invalid_response', 'Backup upload verification failed.');
+    }
+    if (
+      data.storedSizeBytes !== undefined &&
+      data.storedSizeBytes !== manifest.encryptedSizeBytes &&
+      !hasOnlyTrailingCrlfExtra(data.storedSizeBytes, manifest.encryptedSizeBytes)
+    ) {
+      throw new CloudBackupError('invalid_response', 'Backup upload verification failed.');
+    }
+
     onProgress?.({ bytesSent: 1, totalBytes: 1 });
 
-    return toCloudBackupFile(manifest);
+    return {
+      ...toCloudBackupFile(manifest),
+      storedEncryptedSizeBytes: toStoredSize(data.storedSizeBytes),
+    };
   } catch (err) {
     if (err instanceof CloudBackupError) throw err;
     throw mapFetchError(err);
@@ -207,10 +243,19 @@ export async function listCloudBackups(_firebaseUid: string): Promise<CloudBacku
       throw mapHttpError(response.status, body);
     }
 
-    const data = await response.json() as { backups: Array<{ id: string; manifest: unknown }> };
+    const data = await response.json() as {
+      backups: Array<{
+        id: string;
+        manifest: unknown;
+        storedSizeBytes?: unknown;
+      }>;
+    };
     return data.backups
       .filter((b) => isManifest(b.manifest))
-      .map((b) => toCloudBackupFile(b.manifest as EncryptedBackupManifest));
+      .map((b) => ({
+        ...toCloudBackupFile(b.manifest as EncryptedBackupManifest),
+        storedEncryptedSizeBytes: toStoredSize(b.storedSizeBytes),
+      }));
   } catch (err) {
     throw mapFetchError(err);
   }

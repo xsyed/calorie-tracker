@@ -161,7 +161,9 @@ export async function prepareRestoreCandidateFile(
       options.expectedChecksum !== undefined &&
       metadata.checksum !== options.expectedChecksum
     ) {
-      throw new DatabaseBackupFileError('Restore candidate checksum mismatch');
+      throw new DatabaseBackupFileError(
+        `Restore candidate checksum mismatch (${metadata.checksum}/${options.expectedChecksum})`,
+      );
     }
     return { ...metadata, compressed: false, filePath };
   } catch (err) {

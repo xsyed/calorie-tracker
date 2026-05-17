@@ -35,9 +35,17 @@ class BackupCryptoModule(
   @ReactMethod
   fun encryptBackupFile(options: ReadableMap, promise: Promise) {
     try {
-      val password = options.getString("password")?.trim().orEmpty()
+      val password = if (options.hasKey("password")) {
+        options.getString("password")?.trim().orEmpty()
+      } else {
+        null
+      }
       val storedKeyMaterial = loadStoredKeyMaterial()
-      val keyMaterial = storedKeyMaterial ?: createAndStoreKeyMaterial(password)
+      val keyMaterial = when {
+        storedKeyMaterial == null -> createAndStoreKeyMaterial(password.orEmpty())
+        password != null -> rewrapAndStoreKeyMaterial(storedKeyMaterial, password)
+        else -> storedKeyMaterial
+      }
       val contentIv = randomBytes(GCM_IV_BYTES)
       val inputPath = requireString(options, "inputPath")
       val outputPath = requireString(options, "outputPath")
@@ -82,9 +90,21 @@ class BackupCryptoModule(
       val wrapIv = decode(requireString(manifest, "wrapIv"))
       val wrappedDataKey = decode(requireString(manifest, "wrappedDataKey"))
       val contentIv = decode(requireString(manifest, "contentIv"))
+      val encryptedSizeBytes = requireDouble(manifest, "encryptedSizeBytes").toInt()
       val wrappingKey = deriveWrappingKey(password, salt)
-      val dataKey = decryptBytes(wrappedDataKey, wrappingKey, wrapIv)
-      decryptFile(inputPath, outputPath, dataKey, contentIv)
+      val dataKey = try {
+        decryptBytes(wrappedDataKey, wrappingKey, wrapIv)
+      } catch (error: AEADBadTagException) {
+        loadStoredKeyMaterial()?.dataKey ?: throw error
+      }
+      try {
+        decryptFile(inputPath, outputPath, dataKey, contentIv, encryptedSizeBytes)
+      } catch (error: AEADBadTagException) {
+        throw BackupCryptoException(
+          "BACKUP_CONTENT_DECRYPT_FAILED",
+          "Backup content could not be decrypted.",
+        )
+      }
       promise.resolve(null)
     } catch (error: AEADBadTagException) {
       File(outputPath).delete()
@@ -126,6 +146,31 @@ class BackupCryptoModule(
     return StoredKeyMaterial(dataKey, salt, wrapIv, wrappedDataKey)
   }
 
+  private fun rewrapAndStoreKeyMaterial(
+    storedKeyMaterial: StoredKeyMaterial,
+    password: String,
+  ): StoredKeyMaterial {
+    if (password.isBlank()) {
+      throw BackupCryptoException(
+        "BACKUP_PASSWORD_REQUIRED",
+        "Backup password is required before backup.",
+      )
+    }
+
+    val salt = randomBytes(SALT_BYTES)
+    val wrapIv = randomBytes(GCM_IV_BYTES)
+    val wrappingKey = deriveWrappingKey(password, salt)
+    val wrappedDataKey = encryptBytes(storedKeyMaterial.dataKey, wrappingKey, wrapIv)
+
+    getPrefs().edit()
+      .putString(PREF_SALT, encode(salt))
+      .putString(PREF_WRAP_IV, encode(wrapIv))
+      .putString(PREF_WRAPPED_DATA_KEY, encode(wrappedDataKey))
+      .apply()
+
+    return StoredKeyMaterial(storedKeyMaterial.dataKey, salt, wrapIv, wrappedDataKey)
+  }
+
   private fun loadStoredKeyMaterial(): StoredKeyMaterial? {
     val prefs = getPrefs()
     val localDataKey = prefs.getString(PREF_LOCAL_DATA_KEY, null) ?: return null
@@ -159,9 +204,22 @@ class BackupCryptoModule(
     outputPath: String,
     dataKey: ByteArray,
     iv: ByteArray,
+    expectedSizeBytes: Int,
   ) {
-    val decrypted = decryptBytes(File(inputPath).readBytes(), dataKey, iv)
+    val encrypted = normalizeEncryptedFileBytes(File(inputPath).readBytes(), expectedSizeBytes)
+    val decrypted = decryptBytes(encrypted, dataKey, iv)
     File(outputPath).writeBytes(decrypted)
+  }
+
+  private fun normalizeEncryptedFileBytes(data: ByteArray, expectedSizeBytes: Int): ByteArray {
+    if (
+      data.size == expectedSizeBytes + TRAILING_CRLF_BYTES &&
+      data[data.lastIndex - 1] == CR_BYTE &&
+      data[data.lastIndex] == LF_BYTE
+    ) {
+      return data.copyOf(expectedSizeBytes)
+    }
+    return data
   }
 
   private fun deriveWrappingKey(password: String, salt: ByteArray): ByteArray {
@@ -242,6 +300,16 @@ class BackupCryptoModule(
       "Missing $key.",
     )
 
+  private fun requireDouble(map: ReadableMap, key: String): Double =
+    if (map.hasKey(key)) {
+      map.getDouble(key)
+    } else {
+      throw BackupCryptoException(
+        "BACKUP_CRYPTO_FAILED",
+        "Missing $key.",
+      )
+    }
+
   private fun getPrefs() = reactApplicationContext.getSharedPreferences(
     PREFS_NAME,
     Context.MODE_PRIVATE,
@@ -261,9 +329,11 @@ class BackupCryptoModule(
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val GCM_IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
+    private const val CR_BYTE: Byte = 13
     private const val KEY_ALIAS = "calories_backup_local_key"
     private const val KEY_BITS = 256
     private const val KEY_BYTES = 32
+    private const val LF_BYTE: Byte = 10
     private const val PBKDF2_ITERATIONS = 210_000
     private const val PREF_LOCAL_DATA_KEY = "local_data_key"
     private const val PREF_LOCAL_IV = "local_iv"
@@ -272,6 +342,7 @@ class BackupCryptoModule(
     private const val PREF_WRAPPED_DATA_KEY = "wrapped_data_key"
     private const val PREFS_NAME = "backup_crypto"
     private const val SALT_BYTES = 16
+    private const val TRAILING_CRLF_BYTES = 2
   }
 }
 

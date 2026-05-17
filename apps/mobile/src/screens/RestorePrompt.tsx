@@ -51,19 +51,24 @@ export default function RestorePrompt({
 
     setIsRestoring(true);
     setErrorMessage(null);
-    const result = await restoreBackupForUser(
-      latestBackup,
-      candidates,
-      firebaseUid,
-      backupPassword,
-    );
-    setIsRestoring(false);
+    try {
+      const result = await restoreFirstMatchingCandidate(
+        latestBackup,
+        candidates,
+        firebaseUid,
+        backupPassword,
+      );
 
-    if (result.status === 'success') {
-      onRestoreComplete();
-      return;
+      if (result.status === 'success') {
+        onRestoreComplete();
+        return;
+      }
+      setErrorMessage(mapRestoreFailureMessage(result));
+    } catch {
+      setErrorMessage('Restore failed. Try again.');
+    } finally {
+      setIsRestoring(false);
     }
-    setErrorMessage(mapRestoreFailureMessage(result));
   }, [
     candidates,
     firebaseUid,
@@ -250,6 +255,58 @@ function ReadOnlyRow({ label, value, isDarkMode }: ReadOnlyRowProps) {
   );
 }
 
+async function restoreFirstMatchingCandidate(
+  latestBackup: RestoreBackupCandidate,
+  candidates: RestoreBackupCandidate[],
+  firebaseUid: string,
+  backupPassword: string,
+): Promise<RestoreBackupResult> {
+  const restoreCandidates = getRestoreCandidateSequence(latestBackup, candidates);
+  let firstResult: RestoreBackupResult | null = null;
+
+  for (const candidate of restoreCandidates) {
+    const result = await restoreBackupForUser(
+      candidate,
+      restoreCandidates,
+      firebaseUid,
+      backupPassword,
+    );
+    if (result.status === 'success') return result;
+    firstResult ??= result;
+    if (!canTryNextBackup(result)) return result;
+  }
+
+  return firstResult ?? {
+    status: 'error',
+    code: 'restore_failed',
+    message: 'Restore failed. Try again.',
+    nextCandidate: null,
+  };
+}
+
+function getRestoreCandidateSequence(
+  latestBackup: RestoreBackupCandidate,
+  candidates: RestoreBackupCandidate[],
+): RestoreBackupCandidate[] {
+  const latestIndex = candidates.findIndex((candidate) => (
+    candidate.fileId === latestBackup.fileId
+  ));
+  if (latestIndex < 0) return [latestBackup, ...candidates];
+  return candidates.slice(latestIndex);
+}
+
+function canTryNextBackup(
+  result: Extract<RestoreBackupResult, { status: 'error' }>,
+): boolean {
+  return result.nextCandidate !== null && (
+    result.code === 'checksum_mismatch' ||
+    result.code === 'download_failed' ||
+    result.code === 'incorrect_password' ||
+    result.code === 'migration_failed' ||
+    result.code === 'restore_failed'
+  );
+}
+
 function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown date';
@@ -265,7 +322,7 @@ function mapRestoreFailureMessage(
   switch (result.code) {
     case 'checksum_unavailable':
     case 'checksum_mismatch':
-      return 'Backup file is corrupted and cannot be restored.';
+      return result.message;
     case 'incorrect_password':
       return 'Incorrect backup password.';
     case 'download_failed':

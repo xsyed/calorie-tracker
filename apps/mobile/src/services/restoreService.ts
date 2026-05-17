@@ -1,5 +1,6 @@
 import { open } from '@op-engineering/op-sqlite';
 import auth from '@react-native-firebase/auth';
+import RNFS from 'react-native-fs';
 
 import {
   initDatabase,
@@ -21,6 +22,8 @@ import type { CloudBackupFile } from './backendStorageBackupClient';
 import { BackupCryptoError, decryptBackupFile } from './backupCrypto';
 import type { EncryptedBackupManifest } from './backupCrypto';
 import { recoverMealReminderScheduleForUser } from './reminderRecoveryService';
+
+const TRAILING_CRLF_BYTES = 2;
 
 export type RestoreErrorCode =
   | 'checksum_unavailable'
@@ -44,6 +47,7 @@ export interface RestoreBackupCandidate {
   modifiedTime: string;
   name: string;
   sizeBytes: number | null;
+  storedEncryptedSizeBytes: number | null;
 }
 
 export interface DetectRestoreBackupsResult {
@@ -90,6 +94,7 @@ function toCandidate(file: CloudBackupFile): RestoreBackupCandidate {
     modifiedTime: file.modifiedTime,
     name: file.name,
     sizeBytes: file.sizeBytes,
+    storedEncryptedSizeBytes: file.storedEncryptedSizeBytes,
   };
 }
 
@@ -138,6 +143,54 @@ async function verifyCandidateOwner(
     }
   } finally {
     await candidateDb.closeAsync();
+  }
+}
+
+async function verifyDownloadedBackupSize(
+  filePath: string,
+  expectedSizeBytes: number,
+): Promise<void> {
+  const stats = await RNFS.stat(filePath);
+  const sizeBytes = Number(stats.size);
+  if (isExpectedBackupSize(sizeBytes, expectedSizeBytes)) {
+    return;
+  }
+  throw new RestoreFlowError(
+    'checksum_mismatch',
+    `Downloaded backup size mismatch (${sizeBytes}/${expectedSizeBytes} bytes).`,
+  );
+}
+
+function isExpectedBackupSize(
+  actualSizeBytes: number,
+  expectedSizeBytes: number,
+): boolean {
+  return actualSizeBytes === expectedSizeBytes ||
+    actualSizeBytes === expectedSizeBytes + TRAILING_CRLF_BYTES;
+}
+
+function getBackupSizeMismatchMessage(
+  actualSizeBytes: number,
+  expectedSizeBytes: number,
+): string | null {
+  if (isExpectedBackupSize(actualSizeBytes, expectedSizeBytes)) return null;
+  if (actualSizeBytes < expectedSizeBytes) {
+    return `Stored backup is incomplete (${actualSizeBytes}/${expectedSizeBytes} bytes).`;
+  }
+  return `Stored backup size mismatch (${actualSizeBytes}/${expectedSizeBytes} bytes).`;
+}
+
+function validateCloudBackupSize(candidate: RestoreBackupCandidate): void {
+  if (candidate.storedEncryptedSizeBytes === null) return;
+  const mismatchMessage = getBackupSizeMismatchMessage(
+    candidate.storedEncryptedSizeBytes,
+    candidate.manifest.encryptedSizeBytes,
+  );
+  if (mismatchMessage !== null) {
+    throw new RestoreFlowError(
+      'checksum_mismatch',
+      mismatchMessage,
+    );
   }
 }
 
@@ -208,7 +261,7 @@ function mapRestoreError(
       status: 'error',
       code: checksumMismatch ? 'checksum_mismatch' : 'restore_failed',
       message: checksumMismatch
-        ? 'Backup file is corrupted.'
+        ? err.message
         : 'Backup file could not be prepared.',
       nextCandidate,
     };
@@ -257,13 +310,14 @@ export async function restoreBackupForUser(
       nextCandidate: getNextCandidate(candidate, candidates),
     };
   }
-
   const downloadPath = await createRestoreDownloadFilePath();
   const decryptedPath = await createRestoreDownloadFilePath();
   let candidatePath: string | null = null;
 
   try {
+    validateCloudBackupSize(candidate);
     await downloadCloudBackup(firebaseUid, candidate.fileId, downloadPath);
+    await verifyDownloadedBackupSize(downloadPath, candidate.manifest.encryptedSizeBytes);
     await decryptBackupFile(downloadPath, decryptedPath, password, candidate.manifest);
     const restoreFile = await prepareRestoreCandidateFile(decryptedPath, {
       expectedChecksum: candidate.checksum,

@@ -28,7 +28,6 @@ import type { BackupMetadata, BackupPreferences } from '../database';
 import type { RootStackParamList } from '../navigation/types';
 import {
   runManualBackup,
-  hasLocalBackupKey,
   syncPeriodicBackupSchedule,
   cancelScheduledMealReminders,
   getNotificationPermissionStatus,
@@ -423,17 +422,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const createBackup = useCallback(async () => {
     if (isBackingUp) return;
 
-    try {
-      if (await hasLocalBackupKey()) {
-        await runBackup();
-        return;
-      }
-      setBackupErrorMessage(null);
-      setBackupPasswordForm({ confirmPassword: '', password: '', visible: true });
-    } catch {
-      setBackupErrorMessage('Backup encryption is unavailable. Try again.');
-    }
-  }, [isBackingUp, runBackup]);
+    setBackupErrorMessage(null);
+    setBackupPasswordForm({ confirmPassword: '', password: '', visible: true });
+  }, [isBackingUp]);
 
   const closeBackupPasswordForm = useCallback(() => {
     setBackupPasswordForm({ confirmPassword: '', password: '', visible: false });
@@ -638,10 +629,10 @@ function BackupPasswordModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.modalCard, isDarkMode && styles.modalCardDark]}>
           <Text style={[styles.modalTitle, isDarkMode && styles.titleDark]}>
-            Create Backup Password
+            Backup Password
           </Text>
           <Text style={[styles.modalBody, isDarkMode && styles.stateBodyDark]}>
-            You will need this password to restore on a new device. It cannot be recovered if lost.
+            This password will restore the backup after reinstalling or changing devices.
           </Text>
           <TextInput
             autoCapitalize="none"

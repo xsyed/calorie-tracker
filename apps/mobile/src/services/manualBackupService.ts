@@ -164,6 +164,13 @@ function mapManualBackupError(err: unknown): ManualBackupFailure {
   }
 
   if (err instanceof CloudBackupError) {
+    if (err.code === 'backup_too_large') {
+      return {
+        status: 'error',
+        code: 'backup_failed',
+        message: 'Backup file is too large to upload.',
+      };
+    }
     if (err.code === 'permission_denied') {
       return {
         status: 'error',
