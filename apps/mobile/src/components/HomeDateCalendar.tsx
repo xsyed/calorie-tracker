@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import { FlatList, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { CalendarList } from 'react-native-calendars';
@@ -155,6 +155,14 @@ export default function HomeDateCalendar({
   const selectedDateIndex = Math.max(0, dateItems.findIndex((item) => item.date === selectedDate));
   const monthIndex = getMonthIndex(monthItems, visibleMonth);
 
+  const scrollDateStripToSelectedDate = useCallback((animated: boolean) => {
+    dateListRef.current?.scrollToIndex({
+      animated,
+      index: selectedDateIndex,
+      viewPosition: 0.5,
+    });
+  }, [selectedDateIndex]);
+
   useEffect(() => {
     setVisibleMonth(getMonthId(selectedDate));
   }, [selectedDate]);
@@ -171,13 +179,9 @@ export default function HomeDateCalendar({
 
   useEffect(() => {
     if (!isExpanded) {
-      dateListRef.current?.scrollToIndex({
-        animated: true,
-        index: selectedDateIndex,
-        viewPosition: 0.5,
-      });
+      requestAnimationFrame(() => scrollDateStripToSelectedDate(true));
     }
-  }, [isExpanded, selectedDateIndex]);
+  }, [dateCellWidth, isExpanded, scrollDateStripToSelectedDate]);
 
   const markedDates = useMemo(() => {
     const dates: Record<string, MarkedDate> = {};
@@ -356,7 +360,8 @@ export default function HomeDateCalendar({
           horizontal
           initialScrollIndex={selectedDateIndex}
           keyExtractor={(item) => item.date}
-          onScrollToIndexFailed={() => undefined}
+          onContentSizeChange={() => scrollDateStripToSelectedDate(false)}
+          onScrollToIndexFailed={() => requestAnimationFrame(() => scrollDateStripToSelectedDate(false))}
           renderItem={renderDateItem}
           showsHorizontalScrollIndicator={false}
           style={styles.dateStrip}
