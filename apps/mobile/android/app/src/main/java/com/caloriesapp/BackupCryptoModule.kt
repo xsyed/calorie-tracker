@@ -64,7 +64,7 @@ class BackupCryptoModule(
       promise.resolve(manifest)
     } catch (error: BackupCryptoException) {
       promise.reject(error.code, error.message, error)
-    } catch (error: RuntimeException) {
+    } catch (error: Exception) {
       promise.reject("BACKUP_CRYPTO_FAILED", error)
     }
   }
@@ -92,7 +92,7 @@ class BackupCryptoModule(
     } catch (error: BackupCryptoException) {
       File(outputPath).delete()
       promise.reject(error.code, error.message, error)
-    } catch (error: RuntimeException) {
+    } catch (error: Exception) {
       File(outputPath).delete()
       promise.reject("BACKUP_CRYPTO_FAILED", error)
     }
@@ -227,7 +227,7 @@ class BackupCryptoModule(
   private fun encryptWithLocalKey(dataKey: ByteArray, iv: ByteArray): ByteArray {
     try {
       return encryptBytes(dataKey, getOrCreateLocalKey(), iv)
-    } catch (e: RuntimeException) {
+    } catch (e: Exception) {
       if (e.message?.contains("IV not permitted", ignoreCase = true) == true) {
         deleteLocalKey()
         return encryptBytes(dataKey, getOrCreateLocalKey(), iv)
