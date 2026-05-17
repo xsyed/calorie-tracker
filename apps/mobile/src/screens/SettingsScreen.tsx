@@ -751,6 +751,8 @@ function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: '
       return 'Backup upload was interrupted. Try again.';
     case 'unsupported_platform':
       return 'Backup is coming soon on this platform.';
+    case 'crypto_failed':
+      return result.message || 'Encryption failed. Try again.';
     case 'backup_failed':
       return 'Cloud backup failed. Check your connection and try again.';
   }

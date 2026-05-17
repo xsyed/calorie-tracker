@@ -32,6 +32,7 @@ export type ManualBackupErrorCode =
   | 'quota_exceeded'
   | 'interrupted_upload'
   | 'unsupported_platform'
+  | 'crypto_failed'
   | 'backup_failed';
 
 export type ManualBackupStep =
@@ -151,6 +152,13 @@ function mapManualBackupError(err: unknown): ManualBackupFailure {
         status: 'error',
         code: 'unsupported_platform',
         message: 'Backup is coming soon on this platform.',
+      };
+    }
+    if (err.code === 'crypto_failed') {
+      return {
+        status: 'error',
+        code: 'crypto_failed',
+        message: err.message,
       };
     }
   }
