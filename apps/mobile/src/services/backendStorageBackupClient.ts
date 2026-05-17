@@ -156,34 +156,44 @@ export async function uploadCloudBackup({
   onProgress,
 }: UploadCloudBackupOptions): Promise<CloudBackupFile> {
   try {
-    const formData = new FormData();
-    formData.append('file', {
-      uri: `file://${encryptedFilePath}`,
-      name: 'backup.enc',
-      type: 'application/octet-stream',
-    } as unknown as Blob);
-    formData.append('manifest', JSON.stringify(manifest));
+    const authHeaders = await getAuthHeader();
 
-    if (onProgress) {
-      onProgress({ bytesSent: 0, totalBytes: 1 });
+    const doUpload = (headers: Record<string, string>) =>
+      RNFS.uploadFiles({
+        toUrl: `${API_BASE_URL}/api/backup/upload`,
+        files: [{
+          name: 'file',
+          filename: 'backup.enc',
+          filepath: encryptedFilePath,
+          filetype: 'application/octet-stream',
+        }],
+        fields: { manifest: JSON.stringify(manifest) },
+        headers,
+        method: 'POST',
+        begin: () => {
+          onProgress?.({ bytesSent: 0, totalBytes: manifest.encryptedSizeBytes });
+        },
+        progress: (res) => {
+          onProgress?.({ bytesSent: res.totalBytesSent, totalBytes: res.totalBytesExpectedToSend });
+        },
+      });
+
+    let result = await doUpload(authHeaders).promise;
+
+    if (result.statusCode === 401 || result.statusCode === 403) {
+      const refreshedHeaders = await getAuthHeader(true);
+      result = await doUpload(refreshedHeaders).promise;
     }
 
-    const response = await fetchWithAuth(`${API_BASE_URL}/api/backup/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw mapHttpError(response.status, body);
+    if (result.statusCode !== 200) {
+      throw mapHttpError(result.statusCode, result.body);
     }
 
-    if (onProgress) {
-      onProgress({ bytesSent: 1, totalBytes: 1 });
-    }
+    onProgress?.({ bytesSent: 1, totalBytes: 1 });
 
     return toCloudBackupFile(manifest);
   } catch (err) {
+    if (err instanceof CloudBackupError) throw err;
     throw mapFetchError(err);
   }
 }
