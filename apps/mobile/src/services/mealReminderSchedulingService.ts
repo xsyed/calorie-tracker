@@ -21,6 +21,8 @@ import {
 const MEAL_REMINDER_NOTIFICATION_KIND = 'meal-reminder';
 const MEAL_REMINDER_ROUTE = 'Home';
 const MEAL_REMINDER_TITLE = 'Time to log your meal';
+const ANDROID_NOTIFICATION_ICON = 'ic_notification';
+const ANDROID_NOTIFICATION_LARGE_ICON = 'ic_launcher';
 const IOS_SAFE_PENDING_NOTIFICATION_LIMIT = 60;
 
 const WEEKDAY_TO_JS_DAY: Record<ReminderWeekday, number> = {
@@ -163,6 +165,8 @@ function buildNotification(
     },
     android: {
       channelId: MEAL_REMINDERS_CHANNEL_ID,
+      smallIcon: ANDROID_NOTIFICATION_ICON,
+      largeIcon: ANDROID_NOTIFICATION_LARGE_ICON,
       pressAction: {
         id: 'default',
       },
