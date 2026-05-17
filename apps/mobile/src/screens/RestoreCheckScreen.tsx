@@ -16,7 +16,7 @@ export default function RestoreCheckScreen({ route }: RestoreCheckScreenProps) {
   const confirmCancelCheck = () => {
     Alert.alert(
       'Skip backup check?',
-      'This will stop checking for Google Drive backups and start a new onboarding setup.',
+      'This will stop checking for cloud backups and start a new onboarding setup.',
       [
         { text: 'No', style: 'cancel' },
         {
@@ -39,7 +39,6 @@ export default function RestoreCheckScreen({ route }: RestoreCheckScreenProps) {
         candidates={params.restoreCandidates}
         firebaseUid={auth.user.uid}
         isDarkMode={isDarkMode}
-        isGoogleProvider={hasGoogleProvider(auth.user)}
         latestBackup={params.latestRestoreBackup}
         onRestoreComplete={params.onRestoreComplete}
         onStartFresh={params.onStartFresh}
@@ -56,7 +55,7 @@ export default function RestoreCheckScreen({ route }: RestoreCheckScreenProps) {
             Checking for Backup
           </Text>
           <Text style={[styles.body, isDarkMode && styles.bodyDark]}>
-            Looking for a Google Drive backup before onboarding starts.
+            Looking for a cloud backup before onboarding starts.
           </Text>
           <SecondaryButton
             isDarkMode={isDarkMode}
@@ -72,7 +71,7 @@ export default function RestoreCheckScreen({ route }: RestoreCheckScreenProps) {
             No Backup Found
           </Text>
           <Text style={[styles.body, isDarkMode && styles.bodyDark]}>
-            No Google Drive backup was found for this account. Start fresh to continue onboarding.
+            No cloud backup was found for this account. Start fresh to continue onboarding.
           </Text>
           <PrimaryButton label="Start Fresh" onPress={params.onStartFresh} />
         </View>
@@ -87,8 +86,8 @@ export default function RestoreCheckScreen({ route }: RestoreCheckScreenProps) {
             {params.errorMessage}
           </Text>
           <Text style={[styles.diagnostic, isDarkMode && styles.diagnosticDark]}>
-            Google Drive restore needs the drive.appdata scope, enabled Drive API scopes in Cloud Console, and a
-            Firebase Google Sign-In setup that matches this app's SHA fingerprints and google-services.json.
+            Cloud restore needs the backup server to be available. Make sure your internet
+            connection is stable, then try again.
           </Text>
           <View style={styles.buttonGroup}>
             <PrimaryButton label="Retry" onPress={params.onRetry} />
@@ -125,10 +124,6 @@ function SecondaryButton({
       </Text>
     </Pressable>
   );
-}
-
-function hasGoogleProvider(user: NonNullable<ReturnType<typeof useAuth>['user']>): boolean {
-  return user.providerData.some((provider) => provider.providerId === 'google.com');
 }
 
 const styles = StyleSheet.create({

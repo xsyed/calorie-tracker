@@ -12,21 +12,23 @@ import {
   createDatabaseBackupFile,
 } from './databaseBackupFileService';
 import {
-  deleteGoogleDriveBackup,
-  GoogleDriveBackupError,
-  listGoogleDriveBackups,
-  uploadGoogleDriveBackup,
-  verifyGoogleDriveBackupAccess,
-} from './googleDriveBackupClient';
+  deleteCloudBackup,
+  CloudBackupError,
+  listCloudBackups,
+  uploadCloudBackup,
+  verifyCloudBackupAccess,
+} from './backendStorageBackupClient';
+import { BackupCryptoError, encryptBackupFile } from './backupCrypto';
 import type {
-  DriveBackupFile,
+  CloudBackupFile,
   UploadBackupProgress,
-} from './googleDriveBackupClient';
+} from './backendStorageBackupClient';
 
 export type ManualBackupErrorCode =
   | 'no_internet'
+  | 'password_required'
   | 'reauth_required'
-  | 'drive_permission_required'
+  | 'storage_permission_required'
   | 'quota_exceeded'
   | 'interrupted_upload'
   | 'unsupported_platform'
@@ -35,8 +37,9 @@ export type ManualBackupErrorCode =
 export type ManualBackupStep =
   | 'checking_connectivity'
   | 'checking_identity'
-  | 'verifying_drive_access'
+  | 'verifying_storage_access'
   | 'creating_snapshot'
+  | 'encrypting'
   | 'uploading'
   | 'cleaning_old_backups'
   | 'saving_metadata'
@@ -51,7 +54,7 @@ export interface ManualBackupProgress {
 export interface ManualBackupSuccess {
   status: 'success';
   metadata: BackupMetadata;
-  driveFile: DriveBackupFile;
+  cloudFile: CloudBackupFile;
 }
 
 export interface ManualBackupFailure {
@@ -64,6 +67,7 @@ export type ManualBackupResult = ManualBackupSuccess | ManualBackupFailure;
 
 export interface RunManualBackupOptions {
   onProgress?: (progress: ManualBackupProgress) => void;
+  password?: string;
 }
 
 const RETENTION_COUNT = DEFAULT_MAX_BACKUP_COUNT;
@@ -88,27 +92,27 @@ function toTimestamp(value: string): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function sortNewestFirst(files: DriveBackupFile[]): DriveBackupFile[] {
+function sortNewestFirst(files: CloudBackupFile[]): CloudBackupFile[] {
   return [...files].sort(
     (left, right) => toTimestamp(right.createdTime) - toTimestamp(left.createdTime),
   );
 }
 
-async function deleteOldBackups(maxCount: number): Promise<DriveBackupFile[]> {
-  const backups = sortNewestFirst(await listGoogleDriveBackups());
+async function deleteOldBackups(firebaseUid: string, maxCount: number): Promise<CloudBackupFile[]> {
+  const backups = sortNewestFirst(await listCloudBackups(firebaseUid));
   const retainedBackups = backups.slice(0, maxCount);
   const staleBackups = backups.slice(maxCount);
 
-  await Promise.all(staleBackups.map((backup) => deleteGoogleDriveBackup(backup.id)));
+  await Promise.all(staleBackups.map((backup) => deleteCloudBackup(firebaseUid, backup.id)));
   return retainedBackups;
 }
 
-async function cleanupForQuotaRetry(): Promise<void> {
-  await deleteOldBackups(Math.max(RETENTION_COUNT - 1, 0));
+async function cleanupForQuotaRetry(firebaseUid: string): Promise<void> {
+  await deleteOldBackups(firebaseUid, Math.max(RETENTION_COUNT - 1, 0));
 }
 
 function isQuotaError(err: unknown): boolean {
-  return err instanceof GoogleDriveBackupError && err.code === 'quota_exceeded';
+  return err instanceof CloudBackupError && err.code === 'quota_exceeded';
 }
 
 async function verifyFirebaseIdentity(): Promise<ManualBackupFailure | null> {
@@ -134,26 +138,29 @@ async function verifyFirebaseIdentity(): Promise<ManualBackupFailure | null> {
 }
 
 function mapManualBackupError(err: unknown): ManualBackupFailure {
-  if (err instanceof GoogleDriveBackupError) {
-    if (err.code === 'drive_unavailable') {
+  if (err instanceof BackupCryptoError) {
+    if (err.code === 'password_required') {
+      return {
+        status: 'error',
+        code: 'password_required',
+        message: 'Create a backup password before backing up.',
+      };
+    }
+    if (err.code === 'unsupported_platform') {
       return {
         status: 'error',
         code: 'unsupported_platform',
         message: 'Backup is coming soon on this platform.',
       };
     }
-    if (err.code === 'reauth_required') {
-      return {
-        status: 'error',
-        code: 'reauth_required',
-        message: 'Google Drive access required. Please sign in again.',
-      };
-    }
+  }
+
+  if (err instanceof CloudBackupError) {
     if (err.code === 'permission_denied') {
       return {
         status: 'error',
-        code: 'drive_permission_required',
-        message: 'Google Drive permission is missing or misconfigured.',
+        code: 'storage_permission_required',
+        message: 'Cloud backup permission is missing or misconfigured.',
       };
     }
     if (err.code === 'quota_exceeded') {
@@ -180,35 +187,34 @@ function mapManualBackupError(err: unknown): ManualBackupFailure {
 }
 
 async function uploadWithQuotaRetry(
-  checksum: string,
-  filePath: string,
-  fileName: string,
-  firebaseUid: string,
-  mimeType: string,
+  encryptedFilePath: string,
+  manifest: Awaited<ReturnType<typeof encryptBackupFile>>,
   options: RunManualBackupOptions,
-): Promise<DriveBackupFile> {
+): Promise<CloudBackupFile> {
   try {
-    return await uploadGoogleDriveBackup({
-      checksum,
-      fileName,
-      filePath,
-      firebaseUid,
-      mimeType,
+    return await uploadCloudBackup({
+      encryptedFilePath,
+      manifest,
       onProgress: (progress) => emitProgress(options, mapUploadProgress(progress)),
     });
   } catch (err) {
     if (!isQuotaError(err)) throw err;
     emitProgress(options, { step: 'cleaning_old_backups' });
-    await cleanupForQuotaRetry();
-    return uploadGoogleDriveBackup({
-      checksum,
-      fileName,
-      filePath,
-      firebaseUid,
-      mimeType,
+    await cleanupForQuotaRetry(manifest.firebaseUid);
+    return uploadCloudBackup({
+      encryptedFilePath,
+      manifest,
       onProgress: (progress) => emitProgress(options, mapUploadProgress(progress)),
     });
   }
+}
+
+function createBackupId(): string {
+  return `backup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createEncryptedBackupPath(filePath: string): string {
+  return `${filePath}.enc`;
 }
 
 export async function runManualBackup(
@@ -244,26 +250,34 @@ export async function runManualBackup(
   }
 
   try {
-    emitProgress(options, { step: 'verifying_drive_access' });
-    await verifyGoogleDriveBackupAccess();
+    emitProgress(options, { step: 'verifying_storage_access' });
+    await verifyCloudBackupAccess(firebaseUid);
     emitProgress(options, { step: 'creating_snapshot' });
     const backupFile = await createDatabaseBackupFile();
+    const encryptedFilePath = createEncryptedBackupPath(backupFile.filePath);
 
     try {
-      emitProgress(options, { step: 'uploading' });
-      const driveFile = await uploadWithQuotaRetry(
-        backupFile.checksum,
-        backupFile.filePath,
-        backupFile.fileName,
+      const createdTime = new Date().toISOString();
+      emitProgress(options, { step: 'encrypting' });
+      const manifest = await encryptBackupFile({
+        backupId: createBackupId(),
+        createdTime,
         firebaseUid,
-        backupFile.mimeType,
-        options,
-      );
+        inputPath: backupFile.filePath,
+        originalChecksum: backupFile.checksum,
+        originalFileName: backupFile.fileName,
+        originalSizeBytes: backupFile.sizeBytes,
+        outputPath: encryptedFilePath,
+        ...(options.password === undefined ? {} : { password: options.password }),
+      });
+
+      emitProgress(options, { step: 'uploading' });
+      const cloudFile = await uploadWithQuotaRetry(encryptedFilePath, manifest, options);
 
       emitProgress(options, { step: 'cleaning_old_backups' });
-      const retainedBackups = await deleteOldBackups(RETENTION_COUNT);
+      const retainedBackups = await deleteOldBackups(firebaseUid, RETENTION_COUNT);
       const metadata = {
-        last_backup_at: new Date().toISOString(),
+        last_backup_at: createdTime,
         last_backup_size_bytes: backupFile.sizeBytes,
         last_backup_checksum: backupFile.checksum,
         backup_count: retainedBackups.length,
@@ -272,9 +286,12 @@ export async function runManualBackup(
       emitProgress(options, { step: 'saving_metadata' });
       await saveBackupMetadata(metadata);
       emitProgress(options, { step: 'complete' });
-      return { status: 'success', metadata, driveFile };
+      return { status: 'success', metadata, cloudFile };
     } finally {
-      await cleanupDatabaseBackupFile(backupFile);
+      await Promise.all([
+        cleanupDatabaseBackupFile(backupFile),
+        cleanupDatabaseBackupFile(encryptedFilePath),
+      ]);
     }
   } catch (err) {
     return mapManualBackupError(err);

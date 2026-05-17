@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+
 import express, { json } from "express";
 
 import { type BackendConfig } from "./config.js";
@@ -6,6 +8,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { notFoundHandler } from "./middleware/notFoundHandler.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { createApiRouter } from "./routes/api.js";
+import { createBackupRouter } from "./routes/backup.js";
 import { createHealthRouter } from "./routes/health.js";
 
 const REQUEST_BODY_LIMIT = "32kb";
@@ -14,9 +17,16 @@ export function createApp(config: BackendConfig): express.Express {
   const app = express();
   const firebaseAdminHealth = createFirebaseAdminHealth(config);
 
+  try {
+    mkdirSync("/data/backups", { recursive: true });
+  } catch {
+    // volume may not be mounted; backup routes handle missing dir gracefully
+  }
+
   app.use(requestLogger);
   app.use(json({ limit: REQUEST_BODY_LIMIT }));
   app.use(createHealthRouter(firebaseAdminHealth));
+  app.use("/api/backup", createBackupRouter(config));
   app.use("/api", createApiRouter(config));
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   Text,
+  TextInput,
   useColorScheme,
   View,
 } from 'react-native';
@@ -26,6 +28,7 @@ import type { BackupMetadata, BackupPreferences } from '../database';
 import type { RootStackParamList } from '../navigation/types';
 import {
   runManualBackup,
+  hasLocalBackupKey,
   syncPeriodicBackupSchedule,
   cancelScheduledMealReminders,
   getNotificationPermissionStatus,
@@ -91,6 +94,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     useState<ManualBackupProgress | null>(null);
   const [backupStatusMessage, setBackupStatusMessage] = useState<string | null>(null);
   const [backupErrorMessage, setBackupErrorMessage] = useState<string | null>(null);
+  const [backupPasswordForm, setBackupPasswordForm] = useState<{
+    confirmPassword: string;
+    password: string;
+    visible: boolean;
+  }>({ confirmPassword: '', password: '', visible: false });
   const [touchedValidationFields, setTouchedValidationFields] = useState<
     Partial<Record<SettingsValidationField, true>>
   >({});
@@ -383,7 +391,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     );
   }, [isDirty, isSigningOut, signOut]);
 
-  const createBackup = useCallback(async () => {
+  const runBackup = useCallback(async (password?: string) => {
     if (isBackingUp) return;
 
     setIsBackingUp(true);
@@ -394,6 +402,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     try {
       const result = await runManualBackup({
         onProgress: setBackupProgress,
+        ...(password === undefined ? {} : { password }),
       });
 
       if (result.status === 'success') {
@@ -410,6 +419,46 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       setIsBackingUp(false);
     }
   }, [isBackingUp]);
+
+  const createBackup = useCallback(async () => {
+    if (isBackingUp) return;
+
+    try {
+      if (await hasLocalBackupKey()) {
+        await runBackup();
+        return;
+      }
+      setBackupErrorMessage(null);
+      setBackupPasswordForm({ confirmPassword: '', password: '', visible: true });
+    } catch {
+      setBackupErrorMessage('Backup encryption is unavailable. Try again.');
+    }
+  }, [isBackingUp, runBackup]);
+
+  const closeBackupPasswordForm = useCallback(() => {
+    setBackupPasswordForm({ confirmPassword: '', password: '', visible: false });
+  }, []);
+
+  const submitBackupPassword = useCallback(() => {
+    const password = backupPasswordForm.password.trim();
+    const confirmPassword = backupPasswordForm.confirmPassword.trim();
+    if (password.length < 8) {
+      setBackupErrorMessage('Backup password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setBackupErrorMessage('Backup passwords do not match.');
+      return;
+    }
+
+    closeBackupPasswordForm();
+    void runBackup(password);
+  }, [
+    backupPasswordForm.confirmPassword,
+    backupPasswordForm.password,
+    closeBackupPasswordForm,
+    runBackup,
+  ]);
 
   const updateBackupPreferences = useCallback(
     async (preferences: BackupPreferences) => {
@@ -543,7 +592,88 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           bottomInset={insets.bottom}
         />
       ) : null}
+      <BackupPasswordModal
+        confirmPassword={backupPasswordForm.confirmPassword}
+        isDarkMode={isDarkMode}
+        onCancel={closeBackupPasswordForm}
+        onChangeConfirmPassword={(confirmPassword) => {
+          setBackupErrorMessage(null);
+          setBackupPasswordForm((current) => ({ ...current, confirmPassword }));
+        }}
+        onChangePassword={(password) => {
+          setBackupErrorMessage(null);
+          setBackupPasswordForm((current) => ({ ...current, password }));
+        }}
+        onSubmit={submitBackupPassword}
+        password={backupPasswordForm.password}
+        visible={backupPasswordForm.visible}
+      />
     </View>
+  );
+}
+
+interface BackupPasswordModalProps {
+  confirmPassword: string;
+  isDarkMode: boolean;
+  onCancel: () => void;
+  onChangeConfirmPassword: (value: string) => void;
+  onChangePassword: (value: string) => void;
+  onSubmit: () => void;
+  password: string;
+  visible: boolean;
+}
+
+function BackupPasswordModal({
+  confirmPassword,
+  isDarkMode,
+  onCancel,
+  onChangeConfirmPassword,
+  onChangePassword,
+  onSubmit,
+  password,
+  visible,
+}: BackupPasswordModalProps) {
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalCard, isDarkMode && styles.modalCardDark]}>
+          <Text style={[styles.modalTitle, isDarkMode && styles.titleDark]}>
+            Create Backup Password
+          </Text>
+          <Text style={[styles.modalBody, isDarkMode && styles.stateBodyDark]}>
+            You will need this password to restore on a new device. It cannot be recovered if lost.
+          </Text>
+          <TextInput
+            autoCapitalize="none"
+            secureTextEntry
+            placeholder="Backup password"
+            placeholderTextColor={isDarkMode ? '#8E8E93' : '#666666'}
+            value={password}
+            onChangeText={onChangePassword}
+            style={[styles.modalInput, isDarkMode && styles.modalInputDark]}
+          />
+          <TextInput
+            autoCapitalize="none"
+            secureTextEntry
+            placeholder="Confirm password"
+            placeholderTextColor={isDarkMode ? '#8E8E93' : '#666666'}
+            value={confirmPassword}
+            onChangeText={onChangeConfirmPassword}
+            style={[styles.modalInput, isDarkMode && styles.modalInputDark]}
+          />
+          <View style={styles.modalButtonRow}>
+            <Pressable onPress={onCancel} style={styles.modalSecondaryButton}>
+              <Text style={[styles.modalSecondaryText, isDarkMode && styles.titleDark]}>
+                Cancel
+              </Text>
+            </Pressable>
+            <Pressable onPress={onSubmit} style={styles.modalPrimaryButton}>
+              <Text style={styles.modalPrimaryText}>Create Backup</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -609,18 +739,20 @@ function mapBackupFailureMessage(result: Extract<ManualBackupResult, { status: '
   switch (result.code) {
     case 'no_internet':
       return 'No internet connection. Connect and try again.';
+    case 'password_required':
+      return 'Create a backup password before backing up.';
     case 'reauth_required':
-      return 'Google Drive permission missing. Sign in with Google and allow Drive backup access.';
-    case 'drive_permission_required':
-      return 'Google Drive backup permission or console setup is missing. Check Drive API/OAuth consent, then sign in again.';
+      return 'Sign in again before backing up.';
+    case 'storage_permission_required':
+      return 'Cloud backup storage permission is missing. Check your connection and try again.';
     case 'quota_exceeded':
-      return 'Backup storage is full. Delete old Drive app data or try later.';
+      return 'Backup storage is full. Delete old backups or try later.';
     case 'interrupted_upload':
       return 'Backup upload was interrupted. Try again.';
     case 'unsupported_platform':
       return 'Backup is coming soon on this platform.';
     case 'backup_failed':
-      return 'Google Drive backup failed. Check Drive API/OAuth consent setup if this persists.';
+      return 'Cloud backup failed. Check your connection and try again.';
   }
 }
 

@@ -8,9 +8,9 @@ Interview date: 2026-05-10. Domain: mobile calorie tracker with LLM food/exercis
 
 **Initial ask:** "Seamless sync across devices using default Android/iOS SDKs."
 
-**What we learned:** Structured cross-device sync over two fundamentally different cloud APIs (Google Drive AppData + iCloud KVS) is a v2-sized engineering project on its own. You'd need a sync queue, conflict resolution, timestamps, merge logic — all while the two backends have no common semantics. `firestore` was floated but rejected as not "OS built-in."
+**What we learned:** Structured cross-device sync over two fundamentally different cloud APIs is a v2-sized engineering project on its own. You'd need a sync queue, conflict resolution, timestamps, merge logic — all while the two backends have no common semantics. Cloud storage was selected over Google Drive to avoid OAuth scope complexity.
 
-**Decision:** File-level SQLite backup to Google Drive AppData (Android) and iCloud (iOS later). Not real-time sync — backup/restore on device switch or reinstall. The use case (single-device calorie tracking) doesn't justify sync complexity.
+**Decision:** File-level SQLite backup via backend API on Fly.io volume (Android). Not real-time sync — backup/restore on device switch or reinstall. The use case (single-device calorie tracking) doesn't justify sync complexity.
 
 **Why it matters:** This removed a backend-sized problem from the frontend scope. The word "sync" was the trap — it implied bidirectional merge when the actual need was backup.
 
@@ -171,7 +171,7 @@ Interview date: 2026-05-10. Domain: mobile calorie tracker with LLM food/exercis
 │  ┌─ Services ───────────────────────────────────────┐│
 │  │  LLM: send raw text → backend proxy → OpenRouter ││
 │  │  Auth: Firebase Auth (Google + Apple sign-in)    ││
-│  │  Backup: Google Drive AppData (file-level)       ││
+│  │  Backup:     backend API — encrypted SQLite backup      ││
 │  │  Reminders: local notifications, fixed times     ││
 │  │  Offline: NetInfo → queue pending → auto-flush   ││
 │  └──────────────────────────────────────────────────┘│

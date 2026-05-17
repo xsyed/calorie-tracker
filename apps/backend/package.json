@@ -11,6 +11,8 @@
     "lint": "eslint src --ext .ts --cache --cache-location ../../.eslintcache-backend"
   },
   "dependencies": {
+    "@types/busboy": "^1.5.4",
+    "busboy": "^1.6.0",
     "express": "^5.2.1",
     "firebase-admin": "^13.10.0"
   },

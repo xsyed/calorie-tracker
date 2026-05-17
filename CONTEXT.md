@@ -45,7 +45,7 @@ First-run flow collecting gender, height, current weight, goal (lose/maintain/ga
 _Avoid_: Setup wizard, initial configuration
 
 **Backup**:
-File-level SQLite backup to Google Drive AppData (Android) and iCloud (iOS later). Not structured cross-device sync.
+File-level SQLite backup via backend API on Fly.io volume (Android). Not structured cross-device sync.
 _Avoid_: Sync, cloud sync
 
 ## Relationships
@@ -72,4 +72,4 @@ _Avoid_: Sync, cloud sync
 ## Flagged ambiguities
 
 - "calorie deficit" was initially discussed as including exercise — resolved: exercise is shown separately, not subtracted from food budget.
-- "sync" was initially described as real-time cross-device sync — resolved: file-level backup/restore via Google Drive AppData (Android) and iCloud (iOS later), not structured merge sync.
+- "sync" was initially described as real-time cross-device sync — resolved: file-level backup/restore via backend API on Fly.io volume (Android), not structured merge sync.

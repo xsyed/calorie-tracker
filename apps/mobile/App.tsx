@@ -1,4 +1,4 @@
-import { Platform, StatusBar, useColorScheme } from 'react-native';
+import { StatusBar, useColorScheme } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/auth';
 import { rootNavigationRef } from './src/navigation/rootNavigation';
 import RootNavigator from './src/navigation/RootNavigator';
-import { DRIVE_APPDATA_SCOPE } from './src/services';
 
 const googleSignInConfig = {
   webClientId:
@@ -14,11 +13,7 @@ const googleSignInConfig = {
   offlineAccess: true,
 };
 
-GoogleSignin.configure(
-  Platform.OS === 'android'
-    ? { ...googleSignInConfig, scopes: [DRIVE_APPDATA_SCOPE] }
-    : googleSignInConfig,
-);
+GoogleSignin.configure(googleSignInConfig);
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';

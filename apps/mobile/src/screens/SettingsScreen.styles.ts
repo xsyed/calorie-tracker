@@ -111,6 +111,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalCard: {
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    gap: 12,
+  },
+  modalCardDark: {
+    backgroundColor: '#1C1C1E',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  modalBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#666666',
+  },
+  modalInput: {
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1D1D6',
+    color: '#000000',
+    paddingHorizontal: 12,
+  },
+  modalInputDark: {
+    borderColor: '#3A3A3C',
+    color: '#FFFFFF',
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1D1D6',
+  },
+  modalSecondaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  modalPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });
 
 export default styles;

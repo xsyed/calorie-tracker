@@ -13,7 +13,7 @@ import WaterScreen from '../screens/WaterScreen';
 import WeightScreen from '../screens/WeightScreen';
 import {
   detectRestoreBackups,
-  GoogleDriveBackupError,
+  CloudBackupError,
   MealReminderNotificationTapRouter,
   PeriodicBackupTriggers,
   type RestoreBackupCandidate,
@@ -317,7 +317,7 @@ function getRestoreCheckParams({
     return {
       ...baseParams,
       status: 'error',
-      errorMessage: restoreCheckState.errorMessage ?? 'Could not check Google Drive backups.',
+      errorMessage: restoreCheckState.errorMessage ?? 'Could not check cloud backups.',
     };
   }
 
@@ -338,24 +338,21 @@ function getRestoreCheckKey(params: RootStackParamList['RestoreCheck']): string 
 }
 
 function getRestoreDetectionErrorMessage(err: unknown): string {
-  if (err instanceof GoogleDriveBackupError) {
+  if (err instanceof CloudBackupError) {
     switch (err.code) {
-      case 'drive_unavailable':
-        return 'Google Drive restore is only available on Android in this version.';
       case 'permission_denied':
-        return 'Google Drive appData access was denied or is not configured for this OAuth client.';
-      case 'reauth_required':
-        return 'Google Drive access expired or the drive.appdata scope was not granted.';
+        return 'Cloud backup access was denied or the backup server is not available.';
       case 'network_error':
-        return 'Network failed while checking Google Drive backups.';
+        return 'Network failed while checking cloud backups.';
       case 'quota_exceeded':
-        return 'Google Drive AppData quota is exceeded.';
+        return 'Cloud backup storage quota is exceeded.';
+      case 'storage_unavailable':
       case 'api_error':
       case 'invalid_response':
         return err.message;
     }
   }
-  return 'Could not check Google Drive backups.';
+  return 'Could not check cloud backups.';
 }
 
 function isNetworkError(err: unknown): boolean {

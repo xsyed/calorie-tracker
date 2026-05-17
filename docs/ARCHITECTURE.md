@@ -25,7 +25,7 @@ A mobile calorie tracker using LLM-powered food/exercise parsing from freeform t
 │  ┌─ Services ─────────────────────────────────────────────────────────┐ │
 │  │  LLM Proxy:  raw text → backend → OpenRouter (Gemini Flash)        │ │
 │  │  Auth:       Firebase Auth (Google + Apple sign-in only)           │ │
-│  │  Backup:     Google Drive AppData — file-level SQLite backup       │ │
+│  │  Backup:     backend API — encrypted file-level SQLite backup │ │
 │  │  Reminders:  local notifications, user-configured fixed times      │ │
 │  │  Offline:    react-native-netinfo → queue pending → auto-flush     │ │
 │  └────────────────────────────────────────────────────────────────────┘ │
@@ -57,7 +57,7 @@ A mobile calorie tracker using LLM-powered food/exercise parsing from freeform t
 | Default LLM model | Gemini Flash | Specified in architecture diagram |
 | Backend runtime | Node.js / Express | Specified in design decision #7 |
 | Backend host | Fly.io | Specified in design decision #7 |
-| Android backup | Google Drive AppData (file-level) | Specified in design decision #1 |
+| Android backup | Backend API (Fly.io volume, encrypted file-level) | This document |
 | iOS backup | iCloud (planned, not initial) | Specified in design decision #1 |
 | Connectivity detection | react-native-netinfo | Specified in design decision #10 |
 | Local notifications | React Native local notifications | Specified in architecture diagram |
@@ -286,17 +286,20 @@ App triggers periodic backup (if configured)
 Read op-sqlite database file from app storage
         │
         ▼
-Upload to Google Drive AppData folder (Android)
-  → Hidden from user's normal Drive files
-  → Scoped to the app only
+Encrypt with AES-256-GCM (Android Keystore + user password)
+        │
+        ▼
+Upload encrypted file to backend via POST /api/backup/upload
+   → Stored on Fly.io volume at /data/backups
+   → Auth enforced via Firebase ID token
         │
         ▼
 Restore: on new device or reinstall
   1. Authenticate with same Firebase account
   2. App detects no local database
   3. Prompt user to restore from backup
-  4. Download SQLite file from Drive AppData
-  5. Replace local database → all data restored
+  4. Download encrypted file + manifest from backend
+  5. Decrypt, verify checksum, replace local database → all data restored
 ```
 
 Note: This is **not** bidirectional sync. It is file-level backup/restore for device migration or reinstall. There is no merge logic, no conflict resolution, no sync queue.
@@ -356,7 +359,7 @@ All values (daily target, macro targets, activity multiplier) are adjustable in 
 | API authentication | Firebase ID token sent as Bearer token to backend; verified server-side |
 | LLM API key | Stored only on backend; never exposed to client |
 | Rate limiting | 50 calls per device per day, enforced server-side |
-| Data at rest | SQLite file in app-private storage; backed up to Google Drive AppData (scoped to app) |
+| Data at rest | SQLite file in app-private storage; encrypted backups stored on backend Fly.io volume |
 | Unsafe weight loss | Blocked during onboarding: >1kg/week rate rejected with safe alternative proposed |
 
 ---
@@ -375,11 +378,11 @@ All values (daily target, macro targets, activity multiplier) are adjustable in 
 
 ## 10. Backup Strategy
 
-- **Mechanism**: File-level copy of the op-sqlite database file.
-- **Android**: Google Drive AppData — hidden from user's normal Drive, scoped to the app.
+- **Mechanism**: File-level copy of the op-sqlite database file, encrypted with AES-256-GCM (Android Keystore + user password), uploaded to the backend.
+- **Android**: Backend API (`POST /api/backup/upload`), stored on Fly.io volume at `/data/backups`.
 - **iOS**: iCloud (planned for later release, not in initial build).
 - **Trigger**: Manual from Settings; optionally periodic.
-- **Restore**: Authenticate on new device → detect empty database → offer restore → download file → replace.
+- **Restore**: Authenticate on new device → detect empty database → offer restore → download encrypted file from backend → decrypt → replace.
 - **What it is NOT**: Structured cross-device sync, merge logic, conflict resolution, or real-time multi-device access.
 
 ---
@@ -390,7 +393,7 @@ All decisions below are sourced from `research/design-decisions.md`.
 
 | # | Decision | Rationale |
 |---|---|---|
-| 1 | **Backup, not sync** | Structured cross-device sync over Google Drive + iCloud with no common semantics is a v2-sized project. File-level SQLite backup covers device migration/reinstall — the actual need. |
+| 1 | **Backup, not sync** | Structured cross-device sync over two cloud APIs with no common semantics is a v2-sized project. File-level SQLite backup via backend API covers device migration/reinstall — the actual need. |
 | 2 | **Exercise non-offsetting** | LLM-estimated exercise calories are unreliable; encouraging "eating back" exercise undermines weight-loss goals. ExerciseEntry calories are display-only. |
 | 3 | **LLM auto-detect over manual toggle** | No Food/Exercise mode switch. Single input field; LLM returns `foods[]` and `exercises[]` — either or both. Handles mixed input ("pancakes and a 5km run"). |
 | 4 | **Block unsafe weight loss** | Warn vs block: chose block. If weight-loss rate > 1kg/week, reject the goal and propose a safe timeframe. App takes responsibility for safety. |

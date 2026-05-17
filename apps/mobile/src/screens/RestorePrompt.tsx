@@ -2,9 +2,11 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -20,7 +22,6 @@ interface RestorePromptProps {
   candidates: RestoreBackupCandidate[];
   firebaseUid: string;
   isDarkMode: boolean;
-  isGoogleProvider: boolean;
   latestBackup: RestoreBackupCandidate;
   onRestoreComplete: () => void;
   onStartFresh: () => void;
@@ -30,16 +31,17 @@ export default function RestorePrompt({
   candidates,
   firebaseUid,
   isDarkMode,
-  isGoogleProvider,
   latestBackup,
   onRestoreComplete,
   onStartFresh,
 }: RestorePromptProps) {
   const [isRestoring, setIsRestoring] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [passwordPromptVisible, setPasswordPromptVisible] = useState(false);
 
-  const restore = useCallback(async () => {
-    if (isRestoring || !isGoogleProvider) return;
+  const restore = useCallback(async (backupPassword: string) => {
+    if (isRestoring) return;
 
     const isOnline = await checkConnectivity();
     if (!isOnline) {
@@ -49,7 +51,12 @@ export default function RestorePrompt({
 
     setIsRestoring(true);
     setErrorMessage(null);
-    const result = await restoreBackupForUser(latestBackup, candidates, firebaseUid);
+    const result = await restoreBackupForUser(
+      latestBackup,
+      candidates,
+      firebaseUid,
+      backupPassword,
+    );
     setIsRestoring(false);
 
     if (result.status === 'success') {
@@ -60,11 +67,21 @@ export default function RestorePrompt({
   }, [
     candidates,
     firebaseUid,
-    isGoogleProvider,
     isRestoring,
     latestBackup,
     onRestoreComplete,
   ]);
+
+  const submitPassword = useCallback(() => {
+    const backupPassword = password.trim();
+    if (backupPassword.length === 0) {
+      setErrorMessage('Enter the backup password.');
+      return;
+    }
+    setPassword('');
+    setPasswordPromptVisible(false);
+    void restore(backupPassword);
+  }, [password, restore]);
 
   const confirmRestore = useCallback(() => {
     Alert.alert(
@@ -75,16 +92,13 @@ export default function RestorePrompt({
         {
           text: 'Restore',
           onPress: () => {
-            void restore();
+            setErrorMessage(null);
+            setPasswordPromptVisible(true);
           },
         },
       ],
     );
-  }, [latestBackup.createdTime, restore]);
-
-  const providerMessage = isGoogleProvider
-    ? null
-    : 'This v1 backup is stored in Google Drive. Sign in with Google to restore it.';
+  }, [latestBackup.createdTime]);
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
@@ -110,9 +124,6 @@ export default function RestorePrompt({
         <Text style={[styles.warningText, isDarkMode && styles.warningTextDark]}>
           Restore replaces empty local setup. Entries after backup date will not be restored.
         </Text>
-        {providerMessage !== null && (
-          <Text style={styles.errorText}>{providerMessage}</Text>
-        )}
         {errorMessage !== null && (
           <Text style={styles.errorText}>{errorMessage}</Text>
         )}
@@ -128,11 +139,11 @@ export default function RestorePrompt({
           <Pressable
             style={[
               styles.primaryButton,
-              (!isGoogleProvider || isRestoring) && styles.buttonDisabled,
+              isRestoring && styles.buttonDisabled,
             ]}
-            disabled={!isGoogleProvider || isRestoring}
+            disabled={isRestoring}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !isGoogleProvider || isRestoring }}
+            accessibilityState={{ disabled: isRestoring }}
             onPress={confirmRestore}
           >
             <Text style={styles.primaryButtonText}>Restore</Text>
@@ -150,7 +161,73 @@ export default function RestorePrompt({
           </Pressable>
         </View>
       </View>
+      <RestorePasswordModal
+        isDarkMode={isDarkMode}
+        onCancel={() => {
+          setPassword('');
+          setPasswordPromptVisible(false);
+        }}
+        onChangePassword={(value) => {
+          setErrorMessage(null);
+          setPassword(value);
+        }}
+        onSubmit={submitPassword}
+        password={password}
+        visible={passwordPromptVisible}
+      />
     </View>
+  );
+}
+
+interface RestorePasswordModalProps {
+  isDarkMode: boolean;
+  onCancel: () => void;
+  onChangePassword: (value: string) => void;
+  onSubmit: () => void;
+  password: string;
+  visible: boolean;
+}
+
+function RestorePasswordModal({
+  isDarkMode,
+  onCancel,
+  onChangePassword,
+  onSubmit,
+  password,
+  visible,
+}: RestorePasswordModalProps) {
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalCard, isDarkMode && styles.modalCardDark]}>
+          <Text style={[styles.modalTitle, isDarkMode && styles.titleDark]}>
+            Backup Password
+          </Text>
+          <Text style={[styles.modalBody, isDarkMode && styles.bodyDark]}>
+            Enter the password created when this backup was first enabled.
+          </Text>
+          <TextInput
+            autoCapitalize="none"
+            secureTextEntry
+            placeholder="Backup password"
+            placeholderTextColor={isDarkMode ? '#8E8E93' : '#666666'}
+            value={password}
+            onChangeText={onChangePassword}
+            style={[styles.modalInput, isDarkMode && styles.modalInputDark]}
+          />
+          <View style={styles.modalButtonRow}>
+            <Pressable onPress={onCancel} style={styles.modalSecondaryButton}>
+              <Text style={[styles.modalSecondaryText, isDarkMode && styles.titleDark]}>
+                Cancel
+              </Text>
+            </Pressable>
+            <Pressable onPress={onSubmit} style={styles.modalPrimaryButton}>
+              <Text style={styles.modalPrimaryText}>Restore</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -189,6 +266,8 @@ function mapRestoreFailureMessage(
     case 'checksum_unavailable':
     case 'checksum_mismatch':
       return 'Backup file is corrupted and cannot be restored.';
+    case 'incorrect_password':
+      return 'Incorrect backup password.';
     case 'download_failed':
       return 'Backup download failed. Check connection and try again.';
     case 'migration_failed':
@@ -196,11 +275,9 @@ function mapRestoreFailureMessage(
     case 'network_error':
       return 'Network failed while downloading the backup. Check connection and try again.';
     case 'permission_denied':
-      return 'Google Drive appData access is missing. Check Drive API scopes and sign in with Google again.';
+      return 'Cloud backup access was denied. Check your connection and try again.';
     case 'quota_exceeded':
-      return 'Google Drive AppData quota is exceeded.';
-    case 'reauth_required':
-      return 'Google Drive access expired or drive.appdata was not granted. Sign in with Google again.';
+      return 'Cloud backup storage quota is exceeded.';
     case 'uid_mismatch':
       return 'Backup belongs to a different account.';
     case 'unsupported_platform':
@@ -320,5 +397,73 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalCard: {
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    gap: 12,
+  },
+  modalCardDark: {
+    backgroundColor: '#1C1C1E',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  modalBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#666666',
+  },
+  modalInput: {
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1D1D6',
+    color: '#000000',
+    paddingHorizontal: 12,
+  },
+  modalInputDark: {
+    borderColor: '#3A3A3C',
+    color: '#FFFFFF',
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D1D1D6',
+  },
+  modalSecondaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  modalPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

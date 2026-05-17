@@ -7,6 +7,7 @@ Monorepo (npm workspaces): `apps/mobile`, `apps/backend`, `packages/` (empty).
 **apps/mobile** — React Native 0.85.3 bare workflow, TypeScript strict.
 - **Auth:** Firebase Auth — Google + Apple Sign-In. Full flow: sign-in, sign-out, session recovery, network/rate-limit error handling.
 - **DB:** `@op-engineering/op-sqlite` — raw SQL, repository pattern. Tables include `User`, food/exercise logs, app settings, water entries, weight entries, saved meals, meal reminders, reminder settings.
+- **Backup:** File-level SQLite backup to backend API on Fly.io with AES-GCM encryption, password-wrapped backup keys, Keystore-protected local key reuse, checksum validation, UID restore validation, and 5-backup retention.
 - **Navigation:** `@react-navigation/native-stack` only. Auth-aware routing: Splash → Login → RestoreCheck → Onboarding → Home → Weight → Water → Settings.
 - **UI:** Plain React Native `StyleSheet`, dark mode via `useColorScheme`, with `react-native-calendars` plus custom Home date/month lists for header-controlled date navigation. No UI library.
 

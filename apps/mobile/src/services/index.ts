@@ -16,22 +16,25 @@ export type {
   StagedDatabaseBackupFile,
 } from './databaseBackupFileService';
 export {
-  deleteGoogleDriveBackup,
-  downloadGoogleDriveBackup,
-  DRIVE_APPDATA_SCOPE,
-  GoogleDriveBackupError,
-  GoogleDriveQuotaExceededError,
-  GoogleDriveReauthRequiredError,
-  GoogleDriveUnavailableError,
-  listGoogleDriveBackups,
-  uploadGoogleDriveBackup,
-  verifyGoogleDriveBackupAccess,
-} from './googleDriveBackupClient';
+  deleteCloudBackup,
+  downloadCloudBackup,
+  CloudBackupError,
+  listCloudBackups,
+  uploadCloudBackup,
+  verifyCloudBackupAccess,
+} from './backendStorageBackupClient';
 export type {
-  DriveBackupFile,
-  GoogleDriveBackupErrorCode,
+  CloudBackupErrorCode,
+  CloudBackupFile,
   UploadBackupProgress,
-} from './googleDriveBackupClient';
+} from './backendStorageBackupClient';
+export {
+  decryptBackupFile,
+  encryptBackupFile,
+  BackupCryptoError,
+  hasLocalBackupKey,
+} from './backupCrypto';
+export type { EncryptedBackupManifest } from './backupCrypto';
 export { runManualBackup } from './manualBackupService';
 export type {
   ManualBackupErrorCode,

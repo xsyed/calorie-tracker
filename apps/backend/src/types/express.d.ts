@@ -8,6 +8,10 @@ declare global {
         readonly prompt: string;
         readonly deviceId: string;
       };
+      backupUpload?: {
+        readonly file: Buffer;
+        readonly manifest: string;
+      };
     }
   }
 }

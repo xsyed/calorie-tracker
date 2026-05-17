@@ -8,7 +8,10 @@ import com.facebook.react.uimanager.ViewManager
 class PeriodicBackupSchedulerPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> = listOf(PeriodicBackupSchedulerModule(reactContext))
+  ): List<NativeModule> = listOf(
+    BackupCryptoModule(reactContext),
+    PeriodicBackupSchedulerModule(reactContext),
+  )
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,

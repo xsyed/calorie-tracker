@@ -75,7 +75,7 @@ Firebase Auth SDK onAuthStateChanged listener fires
 
 Auth state is consumed by:
 - All LLM service calls (Bearer token in Authorization header)
-- Backup service (Google Drive auth requires same Google account)
+- Backup service (backend API requires Firebase auth)
 - Offline queue flusher (needs valid token to flush)
 
 ---

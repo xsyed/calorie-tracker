@@ -47,7 +47,7 @@ async function canAttemptPeriodicBackup(
 }
 
 async function runAndroidPeriodicBackup(): Promise<PeriodicBackupResult> {
-  if (!hasProvider('google.com')) return 'provider_mismatch';
+  if (auth().currentUser === null) return 'provider_mismatch';
   await runManualBackup();
   return 'attempted';
 }

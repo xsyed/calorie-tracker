@@ -19,6 +19,8 @@ FROM node:22-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN mkdir -p /data/backups && chown -R node:node /data
+
 COPY --chown=node:node --from=build /app/node_modules node_modules
 COPY --chown=node:node --from=build /app/apps/backend/dist apps/backend/dist
 

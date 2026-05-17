@@ -1,4 +1,5 @@
 import { open } from '@op-engineering/op-sqlite';
+import auth from '@react-native-firebase/auth';
 
 import {
   initDatabase,
@@ -12,22 +13,24 @@ import {
   replaceDatabaseWithCandidate,
 } from './databaseBackupFileService';
 import {
-  downloadGoogleDriveBackup,
-  GoogleDriveBackupError,
-  listGoogleDriveBackups,
-} from './googleDriveBackupClient';
-import type { DriveBackupFile } from './googleDriveBackupClient';
+  downloadCloudBackup,
+  CloudBackupError,
+  listCloudBackups,
+} from './backendStorageBackupClient';
+import type { CloudBackupFile } from './backendStorageBackupClient';
+import { BackupCryptoError, decryptBackupFile } from './backupCrypto';
+import type { EncryptedBackupManifest } from './backupCrypto';
 import { recoverMealReminderScheduleForUser } from './reminderRecoveryService';
 
 export type RestoreErrorCode =
   | 'checksum_unavailable'
   | 'checksum_mismatch'
+  | 'incorrect_password'
   | 'download_failed'
   | 'migration_failed'
   | 'network_error'
   | 'permission_denied'
   | 'quota_exceeded'
-  | 'reauth_required'
   | 'uid_mismatch'
   | 'unsupported_platform'
   | 'restore_failed';
@@ -37,6 +40,7 @@ export interface RestoreBackupCandidate {
   createdTime: string;
   fileId: string;
   firebaseUid: string | null;
+  manifest: EncryptedBackupManifest;
   modifiedTime: string;
   name: string;
   sizeBytes: number | null;
@@ -76,12 +80,13 @@ function toTimestamp(value: string): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function toCandidate(file: DriveBackupFile): RestoreBackupCandidate {
+function toCandidate(file: CloudBackupFile): RestoreBackupCandidate {
   return {
     checksum: file.checksum,
     createdTime: file.createdTime,
     fileId: file.id,
     firebaseUid: file.firebaseUid,
+    manifest: file.manifest,
     modifiedTime: file.modifiedTime,
     name: file.name,
     sizeBytes: file.sizeBytes,
@@ -136,28 +141,12 @@ async function verifyCandidateOwner(
   }
 }
 
-function mapDriveRestoreError(err: GoogleDriveBackupError): RestoreBackupFailure {
-  if (err.code === 'drive_unavailable') {
-    return {
-      status: 'error',
-      code: 'unsupported_platform',
-      message: 'Restore is coming soon on this platform.',
-      nextCandidate: null,
-    };
-  }
-  if (err.code === 'reauth_required') {
-    return {
-      status: 'error',
-      code: 'reauth_required',
-      message: 'Google Drive access required. Please sign in again.',
-      nextCandidate: null,
-    };
-  }
+function mapCloudRestoreError(err: CloudBackupError): RestoreBackupFailure {
   if (err.code === 'permission_denied') {
     return {
       status: 'error',
       code: 'permission_denied',
-      message: 'Google Drive appData access is not configured or was denied.',
+      message: 'Cloud backup access is not configured or was denied.',
       nextCandidate: null,
     };
   }
@@ -165,7 +154,7 @@ function mapDriveRestoreError(err: GoogleDriveBackupError): RestoreBackupFailure
     return {
       status: 'error',
       code: 'quota_exceeded',
-      message: 'Google Drive AppData quota exceeded.',
+      message: 'Cloud backup storage quota exceeded.',
       nextCandidate: null,
     };
   }
@@ -192,8 +181,18 @@ function mapRestoreError(
 ): RestoreBackupFailure {
   const nextCandidate = getNextCandidate(candidate, candidates);
 
-  if (err instanceof GoogleDriveBackupError) {
-    return { ...mapDriveRestoreError(err), nextCandidate };
+  if (err instanceof CloudBackupError) {
+    return { ...mapCloudRestoreError(err), nextCandidate };
+  }
+  if (err instanceof BackupCryptoError) {
+    return {
+      status: 'error',
+      code: err.code === 'incorrect_password' ? 'incorrect_password' : 'restore_failed',
+      message: err.code === 'incorrect_password'
+        ? 'Incorrect backup password.'
+        : 'Backup could not be decrypted.',
+      nextCandidate,
+    };
   }
   if (err instanceof RestoreFlowError) {
     return {
@@ -223,8 +222,12 @@ function mapRestoreError(
 }
 
 export async function detectRestoreBackups(): Promise<DetectRestoreBackupsResult> {
+  const currentUser = auth().currentUser;
+  if (currentUser === null) {
+    return { candidates: [], latestBackup: null };
+  }
   const candidates = sortNewestFirst(
-    (await listGoogleDriveBackups()).map(toCandidate),
+    (await listCloudBackups(currentUser.uid)).map(toCandidate),
   );
   return {
     candidates,
@@ -236,6 +239,7 @@ export async function restoreBackupForUser(
   candidate: RestoreBackupCandidate,
   candidates: RestoreBackupCandidate[],
   firebaseUid: string,
+  password: string,
 ): Promise<RestoreBackupResult> {
   if (candidate.checksum === null) {
     return {
@@ -255,11 +259,13 @@ export async function restoreBackupForUser(
   }
 
   const downloadPath = await createRestoreDownloadFilePath();
+  const decryptedPath = await createRestoreDownloadFilePath();
   let candidatePath: string | null = null;
 
   try {
-    await downloadGoogleDriveBackup(candidate.fileId, downloadPath);
-    const restoreFile = await prepareRestoreCandidateFile(downloadPath, {
+    await downloadCloudBackup(firebaseUid, candidate.fileId, downloadPath);
+    await decryptBackupFile(downloadPath, decryptedPath, password, candidate.manifest);
+    const restoreFile = await prepareRestoreCandidateFile(decryptedPath, {
       expectedChecksum: candidate.checksum,
     });
     candidatePath = restoreFile.filePath;
@@ -288,6 +294,7 @@ export async function restoreBackupForUser(
     return mapRestoreError(err, candidate, candidates);
   } finally {
     await cleanupDatabaseBackupFile(downloadPath);
+    await cleanupDatabaseBackupFile(decryptedPath);
     if (candidatePath !== null) await cleanupDatabaseBackupFile(candidatePath);
   }
 }

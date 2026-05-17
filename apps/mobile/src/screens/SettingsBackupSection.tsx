@@ -259,8 +259,9 @@ function formatProgress(progress: ManualBackupProgress): string {
 const BACKUP_STEP_LABELS: Record<ManualBackupProgress['step'], string> = {
   checking_connectivity: 'Checking internet connection...',
   checking_identity: 'Checking signed-in account...',
-  verifying_drive_access: 'Checking Google Drive access...',
+  verifying_storage_access: 'Checking cloud backup access...',
   creating_snapshot: 'Preparing local data...',
+  encrypting: 'Encrypting backup...',
   uploading: 'Uploading backup...',
   cleaning_old_backups: 'Cleaning old backups...',
   saving_metadata: 'Saving backup details...',
