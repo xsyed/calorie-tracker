@@ -112,7 +112,7 @@ class BackupCryptoModule(
     val wrappingKey = deriveWrappingKey(password, salt)
     val wrappedDataKey = encryptBytes(dataKey, wrappingKey, wrapIv)
     val localIv = randomBytes(GCM_IV_BYTES)
-    val localEncryptedDataKey = encryptBytes(dataKey, getOrCreateLocalKey(), localIv)
+    val localEncryptedDataKey = encryptWithLocalKey(dataKey, localIv)
     val prefs = getPrefs()
 
     prefs.edit()
@@ -211,10 +211,29 @@ class BackupCryptoModule(
     )
       .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
       .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+      .setRandomizedEncryptionRequired(false)
       .setKeySize(KEY_BITS)
       .build()
     keyGenerator.init(spec)
     return keyGenerator.generateKey()
+  }
+
+  private fun deleteLocalKey() {
+    val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+    keyStore.load(null)
+    keyStore.deleteEntry(KEY_ALIAS)
+  }
+
+  private fun encryptWithLocalKey(dataKey: ByteArray, iv: ByteArray): ByteArray {
+    try {
+      return encryptBytes(dataKey, getOrCreateLocalKey(), iv)
+    } catch (e: RuntimeException) {
+      if (e.message?.contains("IV not permitted", ignoreCase = true) == true) {
+        deleteLocalKey()
+        return encryptBytes(dataKey, getOrCreateLocalKey(), iv)
+      }
+      throw e
+    }
   }
 
   private fun requireString(map: ReadableMap, key: String): String =
