@@ -219,7 +219,7 @@ export default function RootNavigator() {
           </>
         ) : restoreCheckParams !== null ? (
           <Stack.Screen
-            key={getRestoreCheckKey(restoreCheckParams)}
+            navigationKey={getRestoreCheckKey(restoreCheckParams)}
             name="RestoreCheck"
             component={RestoreCheckScreen}
             initialParams={restoreCheckParams}

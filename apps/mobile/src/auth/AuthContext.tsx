@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
 
 import type { AuthContextValue, AuthState, FirebaseAuthError } from './types';
@@ -40,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await auth().signOut();
+    await Promise.all([auth().signOut(), GoogleSignin.signOut()]);
   }, []);
 
   const getIdToken = useCallback(async (forceRefresh = false) => {
