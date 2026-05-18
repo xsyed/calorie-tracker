@@ -38,7 +38,7 @@ export default function EditFoodEntryPrompt({
       <View style={[styles.card, isDark && styles.cardDark]}>
         <ScrollView keyboardShouldPersistTaps="handled">
           <Text style={[styles.title, isDark && styles.titleDark]}>
-            Edit Prompt
+            Edit Entry
           </Text>
           <TextInput
             value={prompt}
@@ -52,7 +52,7 @@ export default function EditFoodEntryPrompt({
           />
 
           <Text style={[styles.referenceLabel, isDark && styles.referenceLabelDark]}>
-            Original prompt
+            Original entry
           </Text>
           <Text style={[styles.referenceText, isDark && styles.referenceTextDark]}>
             {originalPrompt}
@@ -88,7 +88,7 @@ export default function EditFoodEntryPrompt({
             disabled={!canSubmit}
           >
             <Text style={styles.submitText}>
-              {isSaving ? 'Re-submitting...' : 'Re-submit to LLM'}
+              {isSaving ? 'Updating entry...' : 'Update Entry'}
             </Text>
           </Pressable>
         </View>

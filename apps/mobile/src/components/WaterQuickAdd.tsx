@@ -75,10 +75,12 @@ export default function WaterQuickAdd({
   return (
     <View style={[styles.card, isDarkMode && styles.cardDark]}>
       <View style={styles.header}>
-        <Text style={[styles.title, isDarkMode && styles.titleDark]}>Water</Text>
-        <Pressable onPress={onOpenWater} hitSlop={8}>
-          <Text style={[styles.openLink, { color: accentColor }]}>View</Text>
-        </Pressable>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, isDarkMode && styles.titleDark]}>Water</Text>
+          <Pressable onPress={onOpenWater} hitSlop={8}>
+            <Text style={[styles.openLink, { color: accentColor }]}>View</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.controlRow}>
@@ -136,8 +138,12 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     fontSize: 13,

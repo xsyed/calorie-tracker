@@ -58,14 +58,14 @@ export default function EntryActionsPrompt({
             Entry Actions
           </Text>
           <Text style={[styles.label, isDark && styles.labelDark]}>
-            Original prompt
+            Original entry
           </Text>
           <Text style={[styles.rawText, isDark && styles.rawTextDark]}>
             {entry.rawText}
           </Text>
 
           <Text style={[styles.label, isDark && styles.labelDark]}>
-            Parsed items
+            Detected items
           </Text>
           {entry.items.length > 0 ? (
             entry.items.map((item) => (
@@ -105,7 +105,7 @@ export default function EntryActionsPrompt({
             onPress={onEdit}
             disabled={!canEdit}
           >
-            <Text style={styles.primaryText}>Edit Prompt</Text>
+            <Text style={styles.primaryText}>Edit Entry</Text>
           </Pressable>
           {canSaveAsMeal && (
             <Pressable style={styles.button} onPress={onSaveAsMeal}>

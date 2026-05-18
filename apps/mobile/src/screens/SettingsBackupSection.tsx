@@ -43,10 +43,7 @@ export default function SettingsBackupSection({
   };
 
   return (
-    <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-      <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-        Backup
-      </Text>
+    <>
       {isIos ? (
         <>
           <Text style={[styles.helperText, isDarkMode && styles.helperTextDark]}>
@@ -126,7 +123,7 @@ export default function SettingsBackupSection({
           />
         </>
       )}
-    </View>
+    </>
   );
 }
 

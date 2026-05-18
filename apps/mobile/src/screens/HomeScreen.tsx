@@ -128,7 +128,7 @@ function getEditProgressLabel(step: EditFoodEntryProgressStep): string {
     case 'checking_connectivity':
       return 'Checking connection...';
     case 'parsing':
-      return 'Re-submitting to LLM...';
+      return 'Updating entry...';
     case 'replacing':
       return 'Replacing entry...';
   }
@@ -602,6 +602,10 @@ export default function HomeScreen() {
     navigation.navigate('Settings');
   }, [navigation, resetKeyboardBottomInset]);
 
+  const handleTodayPress = useCallback(() => {
+    setSelectedDate(getTodayDate());
+  }, []);
+
   const handleBookmarkPress = useCallback(() => {
     setHistoryOverlayVisible(true);
   }, []);
@@ -868,6 +872,7 @@ export default function HomeScreen() {
     const d = new Date(selectedDate + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }, [selectedDate]);
+  const isTodaySelected = selectedDate === getTodayDate();
   const inputBarBottom = keyboardBottomInset > 0
     ? keyboardBottomInset + KEYBOARD_TOP_CLEARANCE
     : 0;
@@ -895,6 +900,22 @@ export default function HomeScreen() {
               onVisibleMonthChange={handleVisibleMonthChange}
             />
             <View style={styles.headerActions}>
+              {!isTodaySelected && (
+                <Pressable
+                  accessibilityLabel="Jump to today"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={handleTodayPress}
+                  style={[styles.headerIconButton, isDarkMode && styles.headerIconButtonDark]}
+                >
+                  <View style={styles.todayGlyph}>
+                    <View style={[styles.todayGlyphHeader, isDarkMode && styles.glyphFillDark]} />
+                    <View style={[styles.todayGlyphBody, isDarkMode && styles.todayGlyphBodyDark]}>
+                      <View style={styles.todayGlyphDot} />
+                    </View>
+                  </View>
+                </Pressable>
+              )}
               <Pressable
                 accessibilityLabel="Open settings"
                 accessibilityRole="button"
@@ -930,19 +951,6 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.mainContent}>
             <View style={styles.fixedSummary}>
-              <DailySummary
-                totalCalories={dailyTotals.totalCalories}
-                totalProtein={dailyTotals.totalProtein}
-                totalCarbs={dailyTotals.totalCarbs}
-                totalFat={dailyTotals.totalFat}
-                targetCalories={userTargets?.dailyCalories ?? null}
-                targetProtein={userTargets?.proteinG ?? null}
-                targetCarbs={userTargets?.carbsG ?? null}
-                targetFat={userTargets?.fatG ?? null}
-                exerciseCalories={exerciseCalories}
-                dateLabel={dateLabel}
-                hasEntries={hasEntries}
-              />
               <View style={styles.trackerGrid}>
                 <WaterQuickAdd
                   dailyTotal={dailyWaterTotal}
@@ -958,6 +966,19 @@ export default function HomeScreen() {
                   onLogWeight={handleWeightPress}
                 />
               </View>
+              <DailySummary
+                totalCalories={dailyTotals.totalCalories}
+                totalProtein={dailyTotals.totalProtein}
+                totalCarbs={dailyTotals.totalCarbs}
+                totalFat={dailyTotals.totalFat}
+                targetCalories={userTargets?.dailyCalories ?? null}
+                targetProtein={userTargets?.proteinG ?? null}
+                targetCarbs={userTargets?.carbsG ?? null}
+                targetFat={userTargets?.fatG ?? null}
+                exerciseCalories={exerciseCalories}
+                dateLabel={dateLabel}
+                hasEntries={hasEntries}
+              />
             </View>
             <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer}>
               <EntryList
@@ -1100,6 +1121,35 @@ const styles = StyleSheet.create({
   },
   glyphFillDark: {
     backgroundColor: '#FFFFFF',
+  },
+  todayGlyph: {
+    width: 15,
+    height: 15,
+  },
+  todayGlyphHeader: {
+    height: 4,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    backgroundColor: '#000000',
+  },
+  todayGlyphBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    borderColor: '#000000',
+  },
+  todayGlyphBodyDark: {
+    borderColor: '#FFFFFF',
+  },
+  todayGlyphDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#007AFF',
   },
   settingsGlyph: {
     width: 15,

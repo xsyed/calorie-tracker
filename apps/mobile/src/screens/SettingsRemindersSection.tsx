@@ -121,10 +121,7 @@ export default function SettingsRemindersSection({
   onUpdateForm,
 }: SettingsRemindersSectionProps) {
   return (
-    <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-      <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-        Reminders
-      </Text>
+    <>
       {form === null || permissionStatus === null ? (
         <Text style={[styles.helperText, isDarkMode && styles.helperTextDark]}>
           Reminder settings are loading.
@@ -158,7 +155,7 @@ export default function SettingsRemindersSection({
           onPress={onOpenNotificationSettings}
         />
       )}
-    </View>
+    </>
   );
 }
 

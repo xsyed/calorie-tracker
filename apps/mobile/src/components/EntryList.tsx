@@ -34,6 +34,14 @@ type TimelineItem =
   | { type: 'food'; entry: EntryListFoodEntry }
   | { type: 'exercise'; entry: EntryListExerciseEntry };
 
+interface FoodItemMetric {
+  color: string;
+  label: string;
+  value: number;
+  unit: string;
+  barWidth: number;
+}
+
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -41,13 +49,6 @@ function formatTime(isoString: string): string {
 
 function StatusBadge({ status, isDark }: { status: string; isDark: boolean }) {
   const config = {
-    complete: {
-      label: 'Complete',
-      bg: '#E8F5E9',
-      text: '#2E7D32',
-      bgDark: '#1B3A1B',
-      textDark: '#4CAF50',
-    },
     pending: {
       label: 'Pending',
       bg: '#F5F5F5',
@@ -130,9 +131,6 @@ export default function EntryList({
 
   return (
     <View>
-      <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
-        Today's Entries
-      </Text>
       {timeline.map((item, _index) => {
         if (item.type === 'food') {
           return renderFoodEntry(
@@ -169,7 +167,7 @@ function renderFoodEntry(
         >
           {entry.rawText}
         </Text>
-        <StatusBadge status={entry.status} isDark={isDark} />
+        {!isCompleteEntry(entry) && <StatusBadge status={entry.status} isDark={isDark} />}
       </View>
 
       {isCompleteEntry(entry) && entry.items.length > 0 && (
@@ -179,9 +177,7 @@ function renderFoodEntry(
               <Text style={[styles.itemText, isDark && styles.itemTextDark]}>
                 {'\u2022'} {item.name}
               </Text>
-              <Text style={[styles.itemSummaryText, isDark && styles.itemTextDark]}>
-                {formatFoodItemSummary(item)}
-              </Text>
+              <FoodItemMetrics item={item} isDark={isDark} />
             </View>
           ))}
         </View>
@@ -222,23 +218,49 @@ function isCompleteEntry(entry: EntryListFoodEntry): boolean {
   return entry.status === 'complete';
 }
 
-function formatFoodItemSummary(item: EntryListFoodEntry['items'][number]): string {
-  return [
-    `${formatNumber(item.calories)} kcal`,
-    ...formatMacroParts(item),
-  ].join(' \u00b7 ');
+function FoodItemMetrics({ item, isDark }: { item: EntryListFoodEntry['items'][number]; isDark: boolean }) {
+  const metrics = getFoodItemMetrics(item);
+
+  return (
+    <View style={styles.metricGroup}>
+      {metrics.map((metric) => (
+        <View key={metric.label} style={styles.metric}>
+          <Text style={[styles.metricLabel, isDark && styles.itemTextDark]}>
+            {metric.label}
+          </Text>
+          <Text style={[styles.metricValue, isDark && styles.itemTextDark]} numberOfLines={1}>
+            {formatNumber(metric.value)}{metric.unit}
+          </Text>
+          <View style={[styles.metricTrack, isDark && styles.metricTrackDark]}>
+            <View
+              style={[
+                styles.metricBar,
+                {
+                  backgroundColor: metric.color,
+                  width: `${metric.barWidth}%`,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
 }
 
-function formatMacroParts(item: EntryListFoodEntry['items'][number]): string[] {
-  return [
-    formatMacroPart('P', item.proteinG),
-    formatMacroPart('C', item.carbsG),
-    formatMacroPart('F', item.fatG),
-  ].filter((part): part is string => part !== null);
-}
+function getFoodItemMetrics(item: EntryListFoodEntry['items'][number]): FoodItemMetric[] {
+  const values = [item.calories, item.proteinG, item.carbsG, item.fatG];
+  const maxValue = Math.max(...values, 1);
 
-function formatMacroPart(label: string, value: number): string | null {
-  return value > 0 ? `${label}${formatNumber(value)}g` : null;
+  return [
+    { label: 'Calories', value: item.calories, unit: ' kcal', color: '#FF9500' },
+    { label: 'Protein', value: item.proteinG, unit: 'g', color: '#34C759' },
+    { label: 'Carbs', value: item.carbsG, unit: 'g', color: '#007AFF' },
+    { label: 'Fat', value: item.fatG, unit: 'g', color: '#AF52DE' },
+  ].map((metric) => ({
+    ...metric,
+    barWidth: metric.value > 0 ? Math.max(8, Math.min((metric.value / maxValue) * 100, 100)) : 0,
+  }));
 }
 
 function formatNumber(value: number): string {
@@ -284,16 +306,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
     borderColor: '#333333',
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-    marginBottom: 8,
-    paddingHorizontal: 2,
-  },
-  sectionTitleDark: {
-    color: '#888888',
-  },
   entryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -317,19 +329,49 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   itemRow: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
   itemText: {
     fontSize: 13,
     color: '#666666',
   },
-  itemSummaryText: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 1,
-  },
   itemTextDark: {
     color: '#999999',
+  },
+  metricGroup: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    paddingLeft: 10,
+  },
+  metric: {
+    flex: 1,
+    minWidth: 0,
+  },
+  metricLabel: {
+    marginBottom: 2,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#666666',
+  },
+  metricValue: {
+    marginBottom: 3,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  metricTrack: {
+    height: 2,
+    borderRadius: 1,
+    overflow: 'hidden',
+    backgroundColor: '#E5E5EA',
+  },
+  metricTrackDark: {
+    backgroundColor: '#3A3A3C',
+  },
+  metricBar: {
+    height: 2,
+    borderRadius: 1,
   },
   subtext: {
     fontSize: 13,

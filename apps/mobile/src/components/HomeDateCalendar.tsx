@@ -183,6 +183,14 @@ export default function HomeDateCalendar({
     }
   }, [dateCellWidth, isExpanded, scrollDateStripToSelectedDate]);
 
+  useEffect(() => {
+    if (isExpanded) {
+      requestAnimationFrame(() => {
+        calendarRef.current?.scrollToMonth(selectedDate);
+      });
+    }
+  }, [isExpanded, selectedDate]);
+
   const markedDates = useMemo(() => {
     const dates: Record<string, MarkedDate> = {};
     loggedDates.forEach((date) => {
@@ -363,7 +371,6 @@ export default function HomeDateCalendar({
           horizontal
           initialScrollIndex={selectedDateIndex}
           keyExtractor={(item) => item.date}
-          onContentSizeChange={() => scrollDateStripToSelectedDate(false)}
           onScrollToIndexFailed={() => requestAnimationFrame(() => scrollDateStripToSelectedDate(false))}
           renderItem={renderDateItem}
           showsHorizontalScrollIndicator={false}

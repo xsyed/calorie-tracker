@@ -29,7 +29,6 @@ export default function HomeWeightSummary({
           accessibilityRole="button"
           hitSlop={8}
           onPress={onLogWeight}
-          style={[styles.logButton, { borderColor: accentColor }]}
         >
           <Text style={[styles.logButtonText, { color: accentColor }]}>Log</Text>
         </Pressable>
@@ -37,15 +36,15 @@ export default function HomeWeightSummary({
 
       <View style={styles.valuesRow}>
         <View style={styles.valueBlock}>
-          <Text style={[styles.label, isDarkMode && styles.labelDark]}>Current</Text>
-          <Text style={[styles.value, isDarkMode && styles.titleDark]} numberOfLines={1}>
-            {getWeightLabel(currentWeightKg)}
-          </Text>
-        </View>
-        <View style={styles.valueBlock}>
           <Text style={[styles.label, isDarkMode && styles.labelDark]}>Previous</Text>
           <Text style={[styles.value, isDarkMode && styles.titleDark]} numberOfLines={1}>
             {getWeightLabel(previousWeightKg)}
+          </Text>
+        </View>
+        <View style={styles.valueBlock}>
+          <Text style={[styles.label, isDarkMode && styles.labelDark]}>Current</Text>
+          <Text style={[styles.value, isDarkMode && styles.titleDark]} numberOfLines={1}>
+            {getWeightLabel(currentWeightKg)}
           </Text>
         </View>
       </View>
@@ -68,15 +67,9 @@ const styles = StyleSheet.create({
   titleDark: {
     color: '#FFFFFF',
   },
-  logButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
   logButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
   },
   valuesRow: {
     flexDirection: 'row',

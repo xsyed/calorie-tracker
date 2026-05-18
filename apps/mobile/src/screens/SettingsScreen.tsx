@@ -42,7 +42,7 @@ import {
 } from '../services';
 import SettingsBackupSection, { formatBytes } from './SettingsBackupSection';
 import SettingsForm from './SettingsForm';
-import type { SettingsTextFieldKey } from './SettingsForm';
+import type { SettingsSectionId, SettingsTextFieldKey } from './SettingsForm';
 import SettingsRemindersSection, {
   isReminderSettingsDirty,
   mapRemindersToForm,
@@ -66,6 +66,15 @@ import styles from './SettingsScreen.styles';
 
 type SettingsScreenProps = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 type LoadState = 'loading' | 'ready' | 'missing' | 'error';
+
+const DEFAULT_EXPANDED_SECTIONS: Record<SettingsSectionId, boolean> = {
+  account: true,
+  bodyProfile: false,
+  goalsMacros: false,
+  macroTargets: false,
+  reminders: false,
+  backup: false,
+};
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const auth = useAuth();
@@ -101,6 +110,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [touchedValidationFields, setTouchedValidationFields] = useState<
     Partial<Record<SettingsValidationField, true>>
   >({});
+  const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
   const allowNavigationRef = useRef(false);
 
   const settingsDirty = useMemo(
@@ -255,6 +265,23 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     setTouchedValidationFields((current) => ({ ...current, [field]: true }));
   }, []);
 
+  const toggleSection = useCallback((sectionId: SettingsSectionId) => {
+    setExpandedSections((current) => ({
+      ...current,
+      [sectionId]: !current[sectionId],
+    }));
+  }, []);
+
+  const expandSections = useCallback((sectionIds: SettingsSectionId[]) => {
+    setExpandedSections((current) => {
+      const next = { ...current };
+      sectionIds.forEach((sectionId) => {
+        next[sectionId] = true;
+      });
+      return next;
+    });
+  }, []);
+
   const applyTargetRecalculation = useCallback(() => {
     setFormSettings((current) =>
       current === null
@@ -291,6 +318,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
     const errors = validateSettingsForm(formSettings);
     if (Object.keys(errors).length > 0) {
+      expandSections(getSectionsForSettingsErrors(errors));
       setTouchedValidationFields(
         getAllSettingsValidationFields().reduce<
           Partial<Record<SettingsValidationField, true>>
@@ -302,6 +330,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       return;
     }
     if (Object.keys(reminderValidationErrors).length > 0) {
+      expandSections(['reminders']);
       setSaveError('Fix reminder settings before saving.');
       return;
     }
@@ -310,6 +339,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       formReminderSettings.reminders_enabled &&
       notificationPermissionStatus?.canScheduleMealReminders !== true
     ) {
+      expandSections(['reminders']);
       setSaveError('Enable notifications before saving meal reminders.');
       return;
     }
@@ -340,6 +370,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       setLoadedReminderSettings(formReminderSettings);
       setTouchedValidationFields({});
     } catch (error) {
+      if (error instanceof MealReminderSchedulingError) {
+        expandSections(['reminders']);
+      }
       setSaveError(mapSettingsSaveError(error));
     } finally {
       setIsSaving(false);
@@ -348,6 +381,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     auth.user,
     formReminderSettings,
     formSettings,
+    expandSections,
     notificationPermissionStatus,
     reminderValidationErrors,
     remindersDirty,
@@ -393,6 +427,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const runBackup = useCallback(async (password?: string) => {
     if (isBackingUp) return;
 
+    expandSections(['backup']);
     setIsBackingUp(true);
     setBackupProgress(null);
     setBackupStatusMessage(null);
@@ -417,14 +452,15 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     } finally {
       setIsBackingUp(false);
     }
-  }, [isBackingUp]);
+  }, [expandSections, isBackingUp]);
 
   const createBackup = useCallback(async () => {
     if (isBackingUp) return;
 
+    expandSections(['backup']);
     setBackupErrorMessage(null);
     setBackupPasswordForm({ confirmPassword: '', password: '', visible: true });
-  }, [isBackingUp]);
+  }, [expandSections, isBackingUp]);
 
   const closeBackupPasswordForm = useCallback(() => {
     setBackupPasswordForm({ confirmPassword: '', password: '', visible: false });
@@ -434,10 +470,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     const password = backupPasswordForm.password.trim();
     const confirmPassword = backupPasswordForm.confirmPassword.trim();
     if (password.length < 8) {
+      expandSections(['backup']);
       setBackupErrorMessage('Backup password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
+      expandSections(['backup']);
       setBackupErrorMessage('Backup passwords do not match.');
       return;
     }
@@ -448,12 +486,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     backupPasswordForm.confirmPassword,
     backupPasswordForm.password,
     closeBackupPasswordForm,
+    expandSections,
     runBackup,
   ]);
 
   const updateBackupPreferences = useCallback(
     async (preferences: BackupPreferences) => {
       setBackupPreferencesState(preferences);
+      expandSections(['backup']);
       setBackupStatusMessage(null);
       setBackupErrorMessage(null);
       try {
@@ -464,7 +504,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         void loadSettings();
       }
     },
-    [loadSettings],
+    [expandSections, loadSettings],
   );
 
   const requestReminderPermission = useCallback(async () => {
@@ -571,10 +611,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             />
           )}
           errors={visibleValidationErrors}
+          expandedSections={expandedSections}
           form={formSettings}
           isDarkMode={isDarkMode}
           onBlurValidationField={blurValidationField}
           onRecalculateTargets={recalculateTargets}
+          onToggleSection={toggleSection}
           onUpdateForm={updateForm}
           onUpdateTextField={updateTextField}
           onSignOut={requestSignOut}
@@ -714,6 +756,21 @@ function getVisibleValidationErrors(
     },
     {},
   );
+}
+
+function getSectionsForSettingsErrors(errors: SettingsValidationErrors): SettingsSectionId[] {
+  const sectionIds = new Set<SettingsSectionId>();
+  if (errors.daily_target_calories !== undefined) {
+    sectionIds.add('goalsMacros');
+  }
+  if (
+    errors.protein_g !== undefined ||
+    errors.carbs_g !== undefined ||
+    errors.fat_g !== undefined
+  ) {
+    sectionIds.add('macroTargets');
+  }
+  return Array.from(sectionIds);
 }
 
 function isMacroField(key: SettingsTextFieldKey): boolean {

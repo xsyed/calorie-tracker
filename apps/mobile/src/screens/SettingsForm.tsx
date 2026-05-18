@@ -16,17 +16,26 @@ export type SettingsTextFieldKey = Exclude<
   keyof SettingsFormState,
   'gender' | 'goal' | 'activity_multiplier'
 >;
+export type SettingsSectionId =
+  | 'account'
+  | 'bodyProfile'
+  | 'goalsMacros'
+  | 'macroTargets'
+  | 'reminders'
+  | 'backup';
 
 interface SettingsFormProps {
   authIdentity: string;
   backupSection: React.ReactNode;
   remindersSection: React.ReactNode;
   errors: SettingsValidationErrors;
+  expandedSections: Record<SettingsSectionId, boolean>;
   form: SettingsFormState;
   isDarkMode: boolean;
   onBlurValidationField: (field: SettingsValidationField) => void;
   onRecalculateTargets: () => void;
   onSignOut: () => void;
+  onToggleSection: (sectionId: SettingsSectionId) => void;
   onUpdateForm: (nextValues: Partial<SettingsFormState>) => void;
   onUpdateTextField: (key: SettingsTextFieldKey, value: string) => void;
   signOutError: string | null;
@@ -39,11 +48,13 @@ export default function SettingsForm({
   backupSection,
   remindersSection,
   errors,
+  expandedSections,
   form,
   isDarkMode,
   onBlurValidationField,
   onRecalculateTargets,
   onSignOut,
+  onToggleSection,
   onUpdateForm,
   onUpdateTextField,
   signOutError,
@@ -56,8 +67,11 @@ export default function SettingsForm({
       contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 24 }]}
     >
       <SettingsSection
+        id="account"
         title="Account"
+        expanded={expandedSections.account}
         isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
       >
         <ReadOnlyRow label="Signed in as" value={authIdentity} isDarkMode={isDarkMode} />
         <Pressable
@@ -75,9 +89,12 @@ export default function SettingsForm({
       </SettingsSection>
 
       <SettingsSection
+        id="bodyProfile"
         title="Body Profile"
         helperText="Profile edits do not change goals or macro targets until Recalculate is used."
+        expanded={expandedSections.bodyProfile}
         isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
       >
         <SegmentedField
           label="Gender"
@@ -108,7 +125,13 @@ export default function SettingsForm({
         />
       </SettingsSection>
 
-      <SettingsSection title="Goals & Macros" isDarkMode={isDarkMode}>
+      <SettingsSection
+        id="goalsMacros"
+        title="Goals & Macros"
+        expanded={expandedSections.goalsMacros}
+        isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
+      >
         <SegmentedField
           label="Goal"
           options={GOAL_OPTIONS}
@@ -148,7 +171,13 @@ export default function SettingsForm({
         />
       </SettingsSection>
 
-      <SettingsSection title="Macro Targets" isDarkMode={isDarkMode}>
+      <SettingsSection
+        id="macroTargets"
+        title="Macro Targets"
+        expanded={expandedSections.macroTargets}
+        isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
+      >
         <SettingsInput
           label="Protein"
           unit="g"
@@ -181,37 +210,77 @@ export default function SettingsForm({
         </Pressable>
       </SettingsSection>
 
-      {remindersSection}
+      <SettingsSection
+        id="reminders"
+        title="Reminders"
+        expanded={expandedSections.reminders}
+        isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
+      >
+        {remindersSection}
+      </SettingsSection>
 
-      {backupSection}
+      <SettingsSection
+        id="backup"
+        title="Backup"
+        expanded={expandedSections.backup}
+        isDarkMode={isDarkMode}
+        onToggle={onToggleSection}
+      >
+        {backupSection}
+      </SettingsSection>
     </ScrollView>
   );
 }
 
 interface SettingsSectionProps {
+  id: SettingsSectionId;
   title: string;
+  expanded: boolean;
   isDarkMode: boolean;
+  onToggle: (sectionId: SettingsSectionId) => void;
   helperText?: string;
   children: React.ReactNode;
 }
 
 function SettingsSection({
+  id,
   title,
+  expanded,
   isDarkMode,
+  onToggle,
   helperText,
   children,
 }: SettingsSectionProps) {
   return (
     <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-      <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-        {title}
-      </Text>
-      {helperText !== undefined && (
-        <Text style={[styles.helperText, isDarkMode && styles.helperTextDark]}>
-          {helperText}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => onToggle(id)}
+        style={styles.sectionHeader}
+      >
+        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+          {title}
         </Text>
+        <View
+          style={[
+            styles.sectionChevron,
+            expanded ? styles.sectionChevronUp : styles.sectionChevronDown,
+            isDarkMode && (expanded ? styles.sectionChevronUpDark : styles.sectionChevronDownDark),
+          ]}
+        />
+      </Pressable>
+      {expanded && (
+        <>
+          {helperText !== undefined && (
+            <Text style={[styles.helperText, isDarkMode && styles.helperTextDark]}>
+              {helperText}
+            </Text>
+          )}
+          {children}
+        </>
       )}
-      {children}
     </View>
   );
 }
@@ -361,9 +430,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
   },
   sectionTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
     color: '#000000',
+  },
+  sectionHeader: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sectionChevron: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  sectionChevronDown: {
+    borderTopWidth: 8,
+    borderTopColor: '#000000',
+  },
+  sectionChevronDownDark: {
+    borderTopColor: '#FFFFFF',
+  },
+  sectionChevronUp: {
+    borderBottomWidth: 8,
+    borderBottomColor: '#000000',
+  },
+  sectionChevronUpDark: {
+    borderBottomColor: '#FFFFFF',
   },
   sectionTitleDark: {
     color: '#FFFFFF',
