@@ -31,10 +31,6 @@ export default function WaterQuickAdd({
 }: WaterQuickAddProps) {
   const isDarkMode = useColorScheme() === 'dark';
   const effectiveGoal = waterGoal > 0 ? waterGoal : DEFAULT_WATER_GOAL;
-  const percentage = Math.min(
-    Math.round((dailyTotal / effectiveGoal) * 100),
-    100,
-  );
   const barWidth = Math.min((dailyTotal / effectiveGoal) * 100, 100);
   const debounceRef = useRef(false);
 
@@ -93,7 +89,7 @@ export default function WaterQuickAdd({
           <Text style={[styles.controlButton, { color: accentColor }]}>-</Text>
         </Pressable>
         <Text style={[styles.statsLabel, isDarkMode && styles.statsLabelDark]} numberOfLines={1}>
-          {formatWaterAmount(dailyTotal)}/{formatWaterAmount(effectiveGoal)} ({percentage}%)
+          {formatWaterAmount(dailyTotal)}/{formatWaterAmount(effectiveGoal)}
         </Text>
         <Pressable
           onPress={() => handleQuickAdd(QUICK_ADD_AMOUNT_ML)}

@@ -155,11 +155,12 @@ function renderFoodEntry(
   const isDimmed = isFailed || isPending;
 
   const content = (
-    <View style={[styles.card, isDark && styles.cardDark]}>
+    <View style={[styles.card, styles.entryCard, isDark && styles.cardDark, isDark && styles.entryCardDark]}>
       <View style={styles.entryHeader}>
         <Text
           style={[
             styles.entryTitle,
+            styles.foodEntryTitle,
             isDark && styles.entryTitleDark,
             isDimmed && styles.dimmed,
           ]}
@@ -273,7 +274,10 @@ function renderExerciseEntry(
   onOpenEntryActions: (entryId: string) => void,
 ) {
   const content = (
-    <View key={`exercise-${entry.id}`} style={[styles.card, isDark && styles.cardDark]}>
+    <View
+      key={`exercise-${entry.id}`}
+      style={[styles.card, styles.entryCard, isDark && styles.cardDark, isDark && styles.entryCardDark]}
+    >
       <Text style={[styles.entryTitle, isDark && styles.entryTitleDark]}>
         {entry.durationMinutes} min {entry.type} - {entry.caloriesBurned} kcal
       </Text>
@@ -306,6 +310,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
     borderColor: '#333333',
   },
+  entryCard: {
+    borderWidth: 1,
+    borderColor: '#C7C7CC',
+  },
+  entryCardDark: {
+    borderColor: '#48484A',
+  },
   entryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -317,6 +328,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     flex: 1,
+  },
+  foodEntryTitle: {
+    fontSize: 15,
+    fontWeight: '400',
   },
   entryTitleDark: {
     color: '#FFFFFF',

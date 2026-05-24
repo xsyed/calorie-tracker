@@ -53,7 +53,7 @@ function CompactProgress({
     <View style={styles.metric}>
       <Text style={[styles.metricLabel, isDark && styles.labelDark]}>{label}</Text>
       <Text style={[styles.metricValue, isDark && styles.labelDark]} numberOfLines={1}>
-        {consumed}{unit}/{target}{unit} ({percent}%)
+        {consumed}{unit}/{target}{unit}
       </Text>
       <View style={[styles.track, isDark && styles.trackDark]}>
         <View

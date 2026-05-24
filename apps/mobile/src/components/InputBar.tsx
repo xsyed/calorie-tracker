@@ -94,7 +94,7 @@ export default forwardRef<InputBarHandle, InputBarProps>(function InputBar({
       <TextInput
         ref={inputRef}
         style={[styles.input, isDarkMode && styles.inputDark]}
-        placeholder="What did you eat or do?"
+        placeholder="What did you eat or exercise?"
         placeholderTextColor={isDarkMode ? '#888888' : '#999999'}
         value={text}
         onChangeText={handleChangeText}
