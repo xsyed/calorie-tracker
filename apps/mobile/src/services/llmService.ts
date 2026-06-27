@@ -257,7 +257,7 @@ export async function parseFoodText(
         return rateLimitResult;
       }
       case 502:
-        return { outcome: 'error', error: 'parse_failed', message: 'Parse failed' };
+        return { outcome: 'error', error: 'llm_error', message: 'LLM error' };
       case 504:
         return { outcome: 'error', error: 'llm_timeout', message: 'LLM timeout' };
       default:

@@ -105,6 +105,7 @@ export {
   ensureMealReminderNotificationChannel,
   getNotificationPermissionStatus,
   MEAL_REMINDERS_CHANNEL_ID,
+  openAlarmPermissionSettings,
   openMealReminderChannelSettings,
   openNotificationSettings,
   requestNotificationPermission,

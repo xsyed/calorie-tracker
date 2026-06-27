@@ -1,7 +1,7 @@
 const DEFAULT_PORT = 8080;
 const DEFAULT_RATE_LIMIT_MAX = 50;
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 86_400_000;
-const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-001";
+const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash-lite";
 
 type Env = NodeJS.ProcessEnv;
 

@@ -1,6 +1,8 @@
 import notifee, {
+  AndroidNotificationSetting,
   AndroidImportance,
   AuthorizationStatus,
+  type NotificationSettings,
 } from '@notifee/react-native';
 import { Platform } from 'react-native';
 
@@ -8,6 +10,7 @@ export const MEAL_REMINDERS_CHANNEL_ID = 'meal-reminders';
 
 export type NotificationPermissionState =
   | 'authorized'
+  | 'alarm-disabled'
   | 'blocked'
   | 'channel-blocked'
   | 'denied'
@@ -42,7 +45,7 @@ export async function getNotificationPermissionStatus(): Promise<NotificationPer
   await ensureMealReminderNotificationChannel();
 
   const settings = await notifee.getNotificationSettings();
-  const state = await resolveNotificationPermissionState(settings.authorizationStatus);
+  const state = await resolveNotificationPermissionState(settings);
 
   return {
     state,
@@ -54,7 +57,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   await ensureMealReminderNotificationChannel();
 
   const settings = await notifee.requestPermission(IOS_ALERT_PERMISSIONS);
-  const state = await resolveNotificationPermissionState(settings.authorizationStatus);
+  const state = await resolveNotificationPermissionState(settings);
 
   return {
     state,
@@ -66,14 +69,20 @@ export async function openNotificationSettings(): Promise<void> {
   await notifee.openNotificationSettings();
 }
 
+export async function openAlarmPermissionSettings(): Promise<void> {
+  await notifee.openAlarmPermissionSettings();
+}
+
 export async function openMealReminderChannelSettings(): Promise<void> {
   await ensureMealReminderNotificationChannel();
   await notifee.openNotificationSettings(MEAL_REMINDERS_CHANNEL_ID);
 }
 
 async function resolveNotificationPermissionState(
-  authorizationStatus: AuthorizationStatus,
+  settings: NotificationSettings,
 ): Promise<NotificationPermissionState> {
+  const { authorizationStatus } = settings;
+
   if (authorizationStatus === AuthorizationStatus.NOT_DETERMINED) {
     return 'not-determined';
   }
@@ -84,6 +93,13 @@ async function resolveNotificationPermissionState(
 
   if (Platform.OS === 'android' && (await notifee.isChannelBlocked(MEAL_REMINDERS_CHANNEL_ID))) {
     return 'channel-blocked';
+  }
+
+  if (
+    Platform.OS === 'android' &&
+    settings.android.alarm === AndroidNotificationSetting.DISABLED
+  ) {
+    return 'alarm-disabled';
   }
 
   if (authorizationStatus === AuthorizationStatus.PROVISIONAL) {

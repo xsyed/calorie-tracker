@@ -1,10 +1,12 @@
 import notifee, {
+  AlarmType,
   RepeatFrequency,
   TriggerType,
   type Notification,
   type TimestampTrigger,
   type TriggerNotification,
 } from '@notifee/react-native';
+import { Platform } from 'react-native';
 
 import {
   getMealReminderPreferences,
@@ -177,11 +179,19 @@ function buildNotification(
 function buildWeeklyTrigger(
   { reminder, weekday }: ReminderScheduleRequest,
 ): TimestampTrigger {
-  return {
+  const trigger: TimestampTrigger = {
     type: TriggerType.TIMESTAMP,
     timestamp: getNextReminderTimestamp(reminder.local_time, weekday),
     repeatFrequency: RepeatFrequency.WEEKLY,
   };
+
+  if (Platform.OS === 'android') {
+    trigger.alarmManager = {
+      type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE,
+    };
+  }
+
+  return trigger;
 }
 
 function getNextReminderTimestamp(localTime: string, weekday: ReminderWeekday): number {

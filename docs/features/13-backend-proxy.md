@@ -86,7 +86,7 @@ Construct OpenRouter request:
     X-Title: Calories App
   Body:
     {
-      "model": "google/gemini-2.0-flash-001",
+      "model": "google/gemini-2.5-flash-lite",
       "messages": [
         {
           "role": "system",
@@ -248,7 +248,7 @@ Parse JSON string:
 - Backend is a single-purpose proxy. No business logic, no database, no auth state management beyond token verification.
 - POST /api/parse is the only endpoint beyond health check.
 - Rate limit: 50 calls per device_id per 24h sliding window.
-- OpenRouter model: google/gemini-2.0-flash-001 (configurable via env var for model upgrades).
+- OpenRouter model: google/gemini-2.5-flash-lite (configurable via env var for model upgrades).
 - Request timeout: 10s. Response must be returned within this window.
 - Server must validate and sanitize LLM response before returning to client.
 - Health endpoint: GET /health → 200 { status: "ok", uptime: N }

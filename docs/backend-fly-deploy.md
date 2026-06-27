@@ -18,7 +18,7 @@ Required environment variables in `fly.toml`:
 | `FIREBASE_PROJECT_ID` | Firebase project ID. |
 | `RATE_LIMIT_MAX` | Authenticated parse calls per device and user per window. Default: `50`. |
 | `RATE_LIMIT_WINDOW_MS` | Rate-limit window in milliseconds. Default: `86400000`. |
-| `OPENROUTER_MODEL` | OpenRouter model. Default: `google/gemini-2.0-flash-001`. |
+| `OPENROUTER_MODEL` | OpenRouter model. Default: `google/gemini-2.5-flash-lite`. |
 | `PORT` | Backend listen port. Keep `8080` to match `fly.toml` `internal_port`. |
 | `NODE_ENV` | Use `production` on Fly.io. |
 

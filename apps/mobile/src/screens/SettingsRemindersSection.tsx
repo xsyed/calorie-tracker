@@ -24,6 +24,7 @@ interface SettingsRemindersSectionProps {
   isDarkMode: boolean;
   permissionStatus: NotificationPermissionStatus | null;
   errors: Partial<Record<MealReminderType, string>>;
+  onOpenAlarmPermissionSettings: () => void;
   onOpenChannelSettings: () => void;
   onOpenNotificationSettings: () => void;
   onRequestPermission: () => void;
@@ -115,6 +116,7 @@ export default function SettingsRemindersSection({
   isDarkMode,
   permissionStatus,
   errors,
+  onOpenAlarmPermissionSettings,
   onOpenChannelSettings,
   onOpenNotificationSettings,
   onRequestPermission,
@@ -132,6 +134,13 @@ export default function SettingsRemindersSection({
           buttonLabel="Open Channel Settings"
           isDarkMode={isDarkMode}
           onPress={onOpenChannelSettings}
+        />
+      ) : permissionStatus.state === 'alarm-disabled' ? (
+        <BlockedState
+          body="Exact alarm access is disabled. Meal reminders cannot fire reliably until alarms are allowed."
+          buttonLabel="Open Alarm Settings"
+          isDarkMode={isDarkMode}
+          onPress={onOpenAlarmPermissionSettings}
         />
       ) : permissionStatus.canScheduleMealReminders ? (
         <ReminderForm

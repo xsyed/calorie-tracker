@@ -138,7 +138,8 @@ async function fetchOpenRouter(config: BackendConfig, prompt: string): Promise<R
     });
 
     if (response.status !== 200) {
-      logOpenRouterStatusError(response.status);
+      const responseBody = await readOpenRouterErrorBody(response);
+      logOpenRouterStatusError(config.openrouterModel, response.status, responseBody);
       throw mapOpenRouterError(response.status);
     }
 
@@ -219,9 +220,26 @@ function extractContent(response: ChatCompletionResponse): string {
   return content;
 }
 
+async function readOpenRouterErrorBody(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch (error) {
+    logWarn("openrouter_error_body_read_failed", getErrorContext(error));
+    return "";
+  }
+}
+
 function mapOpenRouterError(statusCode: number): HttpError {
-  const details = statusCode === 401 || statusCode === 403 ? "upstream_auth_failed" : undefined;
-  return new HttpError(502, "llm_error", details);
+  return new HttpError(502, "llm_error", getOpenRouterErrorReason(statusCode));
+}
+
+function getOpenRouterErrorReason(statusCode: number): string {
+  if (statusCode === 401 || statusCode === 403) return "upstream_auth_failed";
+  if (statusCode === 402) return "upstream_payment_required";
+  if (statusCode === 404) return "upstream_model_unavailable";
+  if (statusCode === 429) return "upstream_rate_limited";
+  if (statusCode >= 500) return "upstream_error";
+  return "upstream_rejected_request";
 }
 
 function mapFetchError(error: unknown, signal: AbortSignal): unknown {
@@ -244,9 +262,11 @@ function isObject(value: unknown): value is ChatCompletionResponse {
   return typeof value === "object" && value !== null;
 }
 
-function logOpenRouterStatusError(statusCode: number): void {
+function logOpenRouterStatusError(model: string, statusCode: number, responseBody: string): void {
   logWarn("openrouter_status_error", {
+    model,
     upstream_status: statusCode,
-    reason: statusCode === 401 || statusCode === 403 ? "upstream_auth_failed" : "upstream_error",
+    reason: getOpenRouterErrorReason(statusCode),
+    response_body: responseBody,
   });
 }

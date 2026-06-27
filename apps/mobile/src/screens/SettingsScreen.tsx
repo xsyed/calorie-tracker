@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Modal,
   Pressable,
   Text,
@@ -31,6 +32,7 @@ import {
   syncPeriodicBackupSchedule,
   cancelScheduledMealReminders,
   getNotificationPermissionStatus,
+  openAlarmPermissionSettings,
   openMealReminderChannelSettings,
   openNotificationSettings,
   requestNotificationPermission,
@@ -221,6 +223,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  const refreshNotificationPermissionStatus = useCallback(async () => {
+    setNotificationPermissionStatus(await getNotificationPermissionStatus());
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void refreshNotificationPermissionStatus();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [refreshNotificationPermissionStatus]);
 
   useEffect(() => {
     return navigation.addListener('beforeRemove', (event) => {
@@ -516,6 +532,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     void openNotificationSettings();
   }, []);
 
+  const openReminderAlarmPermissionSettings = useCallback(() => {
+    void openAlarmPermissionSettings();
+  }, []);
+
   const openReminderChannelSettings = useCallback(() => {
     void openMealReminderChannelSettings();
   }, []);
@@ -599,6 +619,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               errors={reminderValidationErrors}
               form={formReminderSettings}
               isDarkMode={isDarkMode}
+              onOpenAlarmPermissionSettings={openReminderAlarmPermissionSettings}
               onOpenChannelSettings={openReminderChannelSettings}
               onOpenNotificationSettings={openReminderNotificationSettings}
               onRequestPermission={requestReminderPermission}
